@@ -5,7 +5,6 @@ import { HeroCarousel } from './components/HeroCarousel';
 import { CoffeeFlavoursGrid } from './components/CoffeeFlavoursGrid';
 import { DynamicSection } from './components/DynamicSection';
 import { PromotionalBanner } from './components/PromotionalBanner';
-import { Footer } from './components/Footer';
 import { FloatingCartBar } from './components/FloatingCartBar';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
@@ -16,6 +15,7 @@ import { CartView } from './components/CartView';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ProductCustomizationModal } from './components/ProductCustomizationModal';
 import { BottomNav } from './components/mobile/BottomNav';
+import { MobileTopAddressBar } from './components/mobile/MobileTopAddressBar';
 import { AddressModal } from './components/mobile/AddressModal';
 import { OffersModal } from './components/mobile/OffersModal';
 import { AccountModal } from './components/mobile/AccountModal';
@@ -95,9 +95,12 @@ export const AppContent: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#0d0a08] text-[#f5f0eb] relative selection:bg-[#c89b63] selection:text-[#100c08] pb-20">
+    <div className="min-h-screen bg-[#0d0a08] text-[#f5f0eb] relative selection:bg-[#c89b63] selection:text-[#100c08] pb-28 md:pb-6">
       {/* Desktop Navbar */}
       <Navbar />
+
+      {/* Mobile Fixed Transparent Address Bar */}
+      <MobileTopAddressBar />
 
       {/* View Content Routing */}
       {currentView === 'cart' && <CartView />}
@@ -119,13 +122,12 @@ export const AppContent: React.FC = () => {
         </>
       )}
 
-      {/* Shared Footer & Floating Elements */}
-      <Footer />
+      {/* Shared Floating Elements */}
       <FloatingCartBar />
       <CartDrawer />
       <CheckoutModal />
       <FloatingOrderBar />
-      <BottomNav onOpenOffers={() => setIsOffersModalOpen(true)} />
+      <BottomNav />
 
       {/* Modals */}
       <AddressModal isOpen={isAddressModalOpen} onClose={() => setIsAddressModalOpen(false)} />

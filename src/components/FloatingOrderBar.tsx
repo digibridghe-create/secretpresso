@@ -33,7 +33,7 @@ export const FloatingOrderBar: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300">
+    <div className="fixed bottom-22 sm:bottom-6 right-4 sm:right-6 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300">
       <button
         onClick={handleTrackClick}
         className="flex items-center gap-3 px-4 py-2.5 rounded-full bg-[#18130f]/95 hover:bg-[#251d16] text-[#f5f0eb] border border-[#523d2d] shadow-2xl backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-95 group focus:outline-none"

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { resolveImage } from '../utils/imageResolver';
-import { MobileFixedLocationBar } from './mobile/MobileFixedLocationBar';
 
 export const HeroCarousel: React.FC = () => {
   const { banners } = useApp();
@@ -24,6 +23,67 @@ export const HeroCarousel: React.FC = () => {
     if (heroBanners.length <= 1) return;
     setCurrentIndex((prev) => (prev + 1) % heroBanners.length);
   }, [heroBanners.length]);
+
+  // Touch swipe handling for mobile
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchDeltaX = useRef<number>(0);
+  const touchDeltaY = useRef<number>(0);
+
+  const resetAutoplay = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (heroBanners.length <= 1 || isPaused) return;
+    const duration = (currentBanner?.slideDuration || 4.5) * 1000;
+    timerRef.current = setTimeout(() => {
+      setCurrentIndex((prev) => (prev + 1) % heroBanners.length);
+    }, duration);
+  }, [heroBanners.length, isPaused, currentBanner]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    touchDeltaX.current = 0;
+    touchDeltaY.current = 0;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
+    touchDeltaY.current = e.touches[0].clientY - touchStartY.current;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+
+    const diffX = touchDeltaX.current;
+    const diffY = touchDeltaY.current;
+    const swipeThreshold = 50; // Sensible 50px threshold
+
+    // Ensure horizontal gesture dominates vertical scrolling
+    if (Math.abs(diffX) >= swipeThreshold && Math.abs(diffX) > Math.abs(diffY) * 1.2) {
+      if (diffX < 0) {
+        // Swiped LEFT -> Next banner
+        nextSlide();
+      } else {
+        // Swiped RIGHT -> Previous banner
+        prevSlide();
+      }
+      resetAutoplay();
+    }
+
+    touchStartX.current = null;
+    touchStartY.current = null;
+    touchDeltaX.current = 0;
+    touchDeltaY.current = 0;
+  };
+
+  const handleTouchCancel = () => {
+    touchStartX.current = null;
+    touchStartY.current = null;
+    touchDeltaX.current = 0;
+    touchDeltaY.current = 0;
+  };
 
   // Autoplay
   useEffect(() => {
@@ -67,13 +127,14 @@ export const HeroCarousel: React.FC = () => {
       aria-roledescription="carousel"
       aria-label="Hero Carousel"
       tabIndex={0}
-      className="relative w-full min-h-[380px] sm:min-h-[430px] md:min-h-[470px] lg:min-h-[500px] max-h-[560px] bg-[#0e0a08] overflow-hidden flex flex-col justify-between select-none focus:outline-none"
+      className="relative w-full min-h-[380px] sm:min-h-[430px] md:min-h-[470px] lg:min-h-[500px] max-h-[560px] bg-[#0e0a08] overflow-hidden flex flex-col justify-between select-none focus:outline-none touch-pan-y cursor-grab active:cursor-grabbing"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
     >
-      {/* Mobile Location & Address Bar Overlaid on Hero Section */}
-      <MobileFixedLocationBar />
-
       {/* Banner Image Background */}
       <div className="absolute inset-0 z-0">
         <img
@@ -86,7 +147,7 @@ export const HeroCarousel: React.FC = () => {
       </div>
 
       {/* Hero Content */}
-      <div className="relative z-25 flex-1 flex flex-col justify-end px-4 sm:px-8 pb-10 sm:pb-12 pt-20">
+      <div className="relative z-25 flex-1 flex flex-col justify-end px-4 sm:px-8 pb-10 sm:pb-12 pt-16 md:pt-24">
         <div className="max-w-3xl space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1c140f]/75 border border-[#c89b63]/40 text-[#dfb780] text-[10px] sm:text-xs font-medium tracking-widest uppercase">
             <Sparkles className="w-3.5 h-3.5 text-[#c89b63]" />

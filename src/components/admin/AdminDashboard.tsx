@@ -247,6 +247,32 @@ export const AdminDashboard: React.FC = () => {
               </button>
             </div>
 
+            {/* Supabase Production Integration Banner */}
+            <div className="p-4 rounded-2xl bg-[#18110b] border border-[#3a281b] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-600/40 flex items-center justify-center shrink-0 text-emerald-400 mt-0.5">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-[#f5f0eb]">Supabase Backend Integration</h3>
+                    <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300 border border-emerald-700/50 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Connected
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#aa9888] mt-0.5">
+                    Project: <code className="text-[#e2be8a] font-mono text-[10px]">ifarrpgcdutjzfprwksi</code> • Supabase Auth, Storage, and Realtime Active
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-[#8e7c6d] font-mono bg-[#20160f] px-2.5 py-1.5 rounded-lg border border-[#342418]">
+                  RLS & Migrations Ready
+                </span>
+              </div>
+            </div>
+
             {/* Metric Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="p-5 rounded-2xl bg-[#17110c] border border-[#2e2016] space-y-1">

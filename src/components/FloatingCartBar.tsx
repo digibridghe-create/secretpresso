@@ -6,6 +6,8 @@ export const FloatingCartBar: React.FC = () => {
   const {
     cart,
     cartCount,
+    cartTotal,
+    settings,
     setIsCartOpen,
     isCartOpen,
     isCheckoutOpen,
@@ -27,73 +29,68 @@ export const FloatingCartBar: React.FC = () => {
     return null;
   }
 
-  // Get unique products in cart (up to 3 for overlapping display)
-  const uniqueProducts = Array.from(
-    new Map(cart.map((item) => [item.product.id, item.product])).values()
-  );
+  // Show every item added up to 5 items on mobile without any hidden-count or overflow indicator for 1-4 items
+  const displayCartItems = cart.slice(0, 5);
 
-  const displayProducts = uniqueProducts.slice(0, 3);
-  const remainingCount = uniqueProducts.length - 3;
-
-  const handleImageError = (productId: string) => {
-    setImageErrors((prev) => ({ ...prev, [productId]: true }));
+  const handleImageError = (itemId: string) => {
+    setImageErrors((prev) => ({ ...prev, [itemId]: true }));
   };
 
+  const currencySymbol = settings?.currencySymbol || '₹';
+  const formattedTotal = Number.isInteger(cartTotal) ? cartTotal : cartTotal.toFixed(0);
+
   return (
-    <div className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] sm:w-auto max-w-xl animate-in fade-in slide-in-from-bottom-5 duration-300">
+    <div
+      className="fixed z-40 left-1/2 -translate-x-1/2 w-fit max-w-[calc(100vw-32px)] sm:max-w-xl animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-auto"
+      style={{
+        bottom: 'max(76px, calc(env(safe-area-inset-bottom, 0px) + 72px))',
+      }}
+    >
       <button
         onClick={() => {
           setIsCartOpen(false);
           setCurrentView('cart');
         }}
-        className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-4 px-4 sm:px-6 py-3.5 rounded-full bg-[#1c140f]/95 hover:bg-[#251b14] text-[#f5f0eb] border border-[#523d2e] shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] group focus:outline-none cursor-pointer"
+        className="h-[48px] sm:h-auto flex items-center justify-center gap-1.5 sm:gap-4 px-2 sm:px-6 py-1 sm:py-3.5 rounded-full bg-[#1A130E]/98 sm:bg-[#1C140F]/95 hover:bg-[#251B14] text-[#F5F0EB] border border-[#483526] shadow-[0_8px_25px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all active:scale-[0.98] group focus:outline-none cursor-pointer"
+        aria-label={`View Cart with ${cartCount} items`}
       >
-        {/* Left Side: Overlapping Product Thumbnails */}
-        <div className="flex items-center -space-x-3.5 sm:-space-x-4 shrink-0 py-0.5 pl-0.5">
-          {displayProducts.map((prod, index) => {
-            const imgSrc =
-              !imageErrors[prod.id] && prod.image ? resolveImage(prod.image) : resolveImage(null);
+        {/* Left: Visible Thumbnails for EVERY added item (28px on mobile, no +X for 1-4 items) */}
+        <div className="flex items-center gap-1 shrink-0">
+          {displayCartItems.map((item) => {
+            const hasError = imageErrors[item.id];
+            const imgSrc = !hasError && item.product.image ? resolveImage(item.product.image) : resolveImage(null);
             return (
               <div
-                key={prod.id}
-                style={{ zIndex: displayProducts.length - index }}
-                className="w-11 h-11 sm:w-13 sm:h-13 rounded-full border-2 border-[#3d2c20] bg-[#221812] overflow-hidden shadow-md flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+                key={item.id}
+                className="w-7 h-7 sm:w-11 sm:h-11 rounded-full border border-[#523C2A] bg-[#221812] overflow-hidden shadow-2xs flex items-center justify-center shrink-0"
               >
                 <img
                   src={imgSrc}
-                  alt={prod.name}
-                  onError={() => handleImageError(prod.id)}
+                  alt={item.product.name}
+                  onError={() => handleImageError(item.id)}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover object-center select-none pointer-events-none"
                 />
               </div>
             );
           })}
-          {remainingCount > 0 && (
-            <div
-              style={{ zIndex: 0 }}
-              className="w-11 h-11 sm:w-13 sm:h-13 rounded-full border-2 border-[#3d2c20] bg-[#c89b63] text-[#120d09] font-bold text-xs flex items-center justify-center shadow-md shrink-0"
-            >
-              +{remainingCount}
-            </div>
-          )}
         </div>
 
-        {/* Center: View cart & Real Item Count */}
-        <div className="flex flex-col text-left px-2 sm:px-3 flex-1 min-w-0">
-          <span className="font-serif text-sm sm:text-base font-semibold text-[#fbf7f2] tracking-wide group-hover:text-[#dfb780] transition-colors">
-            View cart
+        {/* Center: Item Count & Total Amount */}
+        <div className="flex items-center gap-1 sm:gap-2 px-1 sm:px-2 whitespace-nowrap shrink-0">
+          <span className="font-serif text-xs sm:text-sm font-bold text-[#FBF7F2] tracking-wide group-hover:text-[#DFB780] transition-colors">
+            {cartCount} {cartCount === 1 ? 'Item' : 'Items'}
           </span>
-          <span className="text-[11px] sm:text-xs text-[#b8a391] font-medium tracking-wide">
-            {cartCount} {cartCount === 1 ? 'item' : 'items'}
+          <span className="text-[10px] text-[#A89584]">·</span>
+          <span className="text-[11px] sm:text-xs text-[#E4BE88] font-bold">
+            {currencySymbol}{formattedTotal}
           </span>
         </div>
 
-        {/* Right Side: Clean Arrow / Chevron */}
-        <div className="flex items-center gap-2 pl-3 sm:pl-4 border-l border-[#3a291d] shrink-0 text-[#c89b63] group-hover:text-[#dfb780]">
-          <span className="text-sm sm:text-base font-bold tracking-widest group-hover:translate-x-1.5 transition-transform duration-200">
-            →
-          </span>
+        {/* Right: View Cart Action Pill */}
+        <div className="flex items-center gap-1 px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-[#C89B63] hover:bg-[#DFB780] text-[#120D09] text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0 transition-colors shadow-xs">
+          <span>View Cart</span>
+          <span className="text-xs sm:text-sm font-bold group-hover:translate-x-0.5 transition-transform">→</span>
         </div>
       </button>
     </div>

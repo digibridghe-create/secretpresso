@@ -11,6 +11,7 @@ import {
   SelectedCustomizationOption,
 } from '../types';
 import { api } from '../services/api';
+import { supabase, subscribeToSupabaseOrder } from '../lib/supabase';
 
 export type AppView = 'home' | 'our-brew' | 'my-secret' | 'our-story' | 'track-order' | 'cart' | 'admin';
 
@@ -18,6 +19,15 @@ interface ToastItem {
   id: string;
   message: string;
   type: 'success' | 'error' | 'info';
+}
+
+export interface UserProfile {
+  id?: string;
+  name: string;
+  email: string;
+  phone: string;
+  avatarUrl?: string;
+  role?: 'customer' | 'admin';
 }
 
 interface AppContextType {
@@ -82,6 +92,12 @@ interface AppContextType {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   dismissToast: (id: string) => void;
 
+  // Delivery Address & User Profile
+  deliveryAddress: string;
+  setDeliveryAddress: (address: string) => void;
+  userProfile: UserProfile | null;
+  setUserProfile: (profile: UserProfile | null) => void;
+
   // Modals
   isAddressModalOpen: boolean;
   setIsAddressModalOpen: (open: boolean) => void;
@@ -92,6 +108,9 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | null>(null);
+
+const CART_STORAGE_KEY = 'secretpresso_cart';
+const ADDRESS_STORAGE_KEY = 'secretpresso_address';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -104,10 +123,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Cart
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // Cart Persistent State (survives refresh, navigation, and reopening)
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem(CART_STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Could not read saved cart from localStorage:', e);
+    }
+    return [];
+  });
+
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
+  // Sync cart to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+      }
+    } catch (e) {
+      console.warn('Could not write cart to localStorage:', e);
+    }
+  }, [cart]);
 
   // Customization Modal
   const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
@@ -122,6 +163,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentView, setCurrentView] = useState<AppView>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('cat-all');
+
+  // Delivery Address & User Profile
+  const [deliveryAddress, setDeliveryAddressState] = useState<string>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem(ADDRESS_STORAGE_KEY);
+        if (saved) return saved;
+      }
+    } catch (e) {
+      console.warn('Could not read address from localStorage:', e);
+    }
+    return 'Home • 135/10 Vivekanand College, Bengaluru';
+  });
+
+  const setDeliveryAddress = useCallback((addr: string) => {
+    setDeliveryAddressState(addr);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(ADDRESS_STORAGE_KEY, addr);
+      }
+    } catch (e) {
+      console.warn('Could not save address to localStorage:', e);
+    }
+  }, []);
+
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
+    // Default guest profile
+    return {
+      name: 'Aarav Sharma',
+      email: 'aarav.sharma@example.com',
+      phone: '+91 98765 43210',
+      avatarUrl: '',
+      role: 'customer',
+    };
+  });
 
   // Modals
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -167,12 +243,110 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshData();
   }, [refreshData]);
 
-  // Open Customization Modal
-  const openCustomizationModal = useCallback((product: Product, existingItem: CartItem | null = null) => {
-    setCustomizingProduct(product);
-    setEditingCartItem(existingItem);
-    setIsCustomizationOpen(true);
+  // -------------------------------------------------------------
+  // SUPABASE AUTH INITIALIZATION & SESSION RESTORATION
+  // -------------------------------------------------------------
+  useEffect(() => {
+    // Restore existing Supabase session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const u = session.user;
+        setUserProfile({
+          id: u.id,
+          name: u.user_metadata?.full_name || u.email?.split('@')[0] || 'Customer',
+          email: u.email || '',
+          phone: u.user_metadata?.phone || '',
+          avatarUrl: u.user_metadata?.avatar_url || '',
+          role: (u.user_metadata?.role as any) || 'customer',
+        });
+
+        // Try reading role & details from public.profiles table if present
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', u.id)
+          .maybeSingle()
+          .then(({ data: p }) => {
+            if (p) {
+              setUserProfile((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      name: p.full_name || prev.name,
+                      phone: p.phone || prev.phone,
+                      avatarUrl: p.avatar_url || prev.avatarUrl,
+                      role: p.role,
+                    }
+                  : null
+              );
+            }
+          });
+      }
+    });
+
+    // Listen to real-time auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const u = session.user;
+        let role: 'customer' | 'admin' = (u.user_metadata?.role as any) || 'customer';
+
+        const { data: p } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', u.id)
+          .maybeSingle();
+
+        if (p?.role) {
+          role = p.role;
+        }
+
+        setUserProfile({
+          id: u.id,
+          name: p?.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Customer',
+          email: u.email || '',
+          phone: p?.phone || u.user_metadata?.phone || '',
+          avatarUrl: p?.avatar_url || u.user_metadata?.avatar_url || '',
+          role,
+        });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
+  // -------------------------------------------------------------
+  // SUPABASE REALTIME ORDER UPDATES
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const targetOrderId = trackingOrderId || activeOrder?.id;
+    if (!targetOrderId) return;
+
+    const unsubscribe = subscribeToSupabaseOrder(targetOrderId, (newStatus, updatedData) => {
+      showToast(`Order #${targetOrderId} is now ${newStatus.replace(/_/g, ' ')}`, 'info');
+      setActiveOrder((prev) => (prev ? { ...prev, status: newStatus as any } : null));
+      setOrders((prev) =>
+        prev.map((o) => (o.id === targetOrderId ? { ...o, status: newStatus as any } : o))
+      );
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [trackingOrderId, activeOrder?.id, showToast]);
+
+  // Open Customization Modal
+  const openCustomizationModal = useCallback(
+    (product: Product, existingItem: CartItem | null = null) => {
+      setCustomizingProduct(product);
+      setEditingCartItem(existingItem);
+      setIsCustomizationOpen(true);
+    },
+    []
+  );
 
   const closeCustomizationModal = useCallback(() => {
     setIsCustomizationOpen(false);
@@ -223,7 +397,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
 
-        // Check if an item with the EXACT same customizations already exists
+        // Distinct line item logic: different customizations are separate items
         const signature = `${product.id}-${selectedCustomizations
           .map((c) => c.optionId)
           .sort()
@@ -366,6 +540,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSearchQuery,
         selectedCategory,
         setSelectedCategory,
+        deliveryAddress,
+        setDeliveryAddress,
+        userProfile,
+        setUserProfile,
         toasts,
         showToast,
         dismissToast,
