@@ -172,6 +172,7 @@ export interface WebsiteSettings {
     twitter?: string;
     youtube?: string;
   };
+  mobileSearchSuggestions?: string[];
   updatedAt?: string;
 }
 

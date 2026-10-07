@@ -24,7 +24,7 @@ export const CoffeeFlavoursGrid: React.FC = () => {
   return (
     <section
       id="coffee-flavours"
-      className="w-full bg-[#FAF7F2] text-[#140F0B] py-14 sm:py-20 px-4 sm:px-8 border-b border-[#EFE7DA]"
+      className="w-full bg-[#FAF7F2] text-[#140F0B] py-10 sm:py-12 md:py-14 px-4 sm:px-8 border-b border-[#EFE7DA]"
     >
       <div className="max-w-7xl mx-auto">
         {/* Header matching reference screenshot: Title on left, subtitle & View All on right */}

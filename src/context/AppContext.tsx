@@ -12,7 +12,7 @@ import {
 } from '../types';
 import { api } from '../services/api';
 
-export type AppView = 'home' | 'our-brew' | 'my-secret' | 'our-story' | 'track-order' | 'admin';
+export type AppView = 'home' | 'our-brew' | 'my-secret' | 'our-story' | 'track-order' | 'cart' | 'admin';
 
 interface ToastItem {
   id: string;

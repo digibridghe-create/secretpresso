@@ -92,11 +92,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ${
-        isScrolled
-          ? 'bg-[#0d0907]/85 backdrop-blur-md border-b border-white/10 py-3 sm:py-3.5 shadow-xl'
-          : 'bg-transparent py-4 sm:py-5 border-b border-transparent'
-      } px-4 sm:px-8`}
+      className="hidden md:block fixed top-0 left-0 right-0 z-50 w-full bg-transparent backdrop-blur-[2px] border-b border-white/5 py-3 sm:py-4 px-4 sm:px-8 transition-all duration-300"
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
         {/* LEFT: Logo with coffee cup icon outline button matching reference */}

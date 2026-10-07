@@ -775,6 +775,17 @@ function getInitialDatabase(): DatabaseSchema {
       facebook: 'https://facebook.com',
       twitter: 'https://twitter.com',
     },
+    mobileSearchSuggestions: [
+      'Search for coffee...',
+      'Search for burgers...',
+      'Search for desserts...',
+      'Search for tiramisu...',
+      'Search for brownies...',
+      'Search for iced coffee...',
+      'Search for fries...',
+      'Search for sandwiches...',
+      'Search for donuts...',
+    ],
     updatedAt: now,
   };
 
@@ -1098,7 +1109,7 @@ app.get('/api/media', (_req, res) => {
   res.json({ success: true, data: db.media });
 });
 
-app.post('/api/media/upload', upload.single('file'), (req, res) => {
+app.post('/api/media/upload', upload.single('file') as any, (req: any, res: any) => {
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }

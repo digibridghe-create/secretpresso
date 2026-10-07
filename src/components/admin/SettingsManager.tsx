@@ -204,6 +204,82 @@ export const SettingsManager: React.FC = () => {
           </div>
         </div>
 
+        {/* Mobile Search Suggestions Settings */}
+        <div className="p-5 rounded-2xl bg-[#17110c] border border-[#2e2016] space-y-4">
+          <h3 className="font-serif text-base font-medium text-[#fbf7f2] flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-[#c89b63]" />
+            <span>Mobile Search Suggestions</span>
+          </h3>
+          <p className="text-xs text-[#a49180]">
+            Customize the rotating placeholder suggestions displayed in the mobile search bar.
+          </p>
+
+          <div className="space-y-2">
+            {(formData.mobileSearchSuggestions || []).map((sug, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={sug}
+                  onChange={(e) => {
+                    const list = [...(formData.mobileSearchSuggestions || [])];
+                    list[idx] = e.target.value;
+                    setFormData((p) => ({ ...p, mobileSearchSuggestions: list }));
+                  }}
+                  className="flex-1 px-3 py-2 rounded-lg bg-[#1c140f] border border-[#3b2b1d] text-[#f5f0eb] focus:outline-none focus:border-[#c89b63]"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const list = (formData.mobileSearchSuggestions || []).filter((_, i) => i !== idx);
+                    setFormData((p) => ({ ...p, mobileSearchSuggestions: list }));
+                  }}
+                  className="px-3 py-2 rounded-lg bg-rose-950/60 border border-rose-800/60 text-rose-300 hover:bg-rose-900/60"
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <input
+              type="text"
+              id="new-suggestion-input"
+              placeholder="Add new suggestion (e.g. 'Search for secret drinks...')"
+              className="flex-1 px-3.5 py-2 rounded-lg bg-[#1c140f] border border-[#3b2b1d] text-[#f5f0eb] focus:outline-none focus:border-[#c89b63]"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const val = (e.target as HTMLInputElement).value.trim();
+                  if (val) {
+                    setFormData((p) => ({
+                      ...p,
+                      mobileSearchSuggestions: [...(p.mobileSearchSuggestions || []), val],
+                    }));
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('new-suggestion-input') as HTMLInputElement;
+                if (el && el.value.trim()) {
+                  setFormData((p) => ({
+                    ...p,
+                    mobileSearchSuggestions: [...(p.mobileSearchSuggestions || []), el.value.trim()],
+                  }));
+                  el.value = '';
+                }
+              }}
+              className="px-4 py-2 rounded-lg bg-[#c89b63] text-[#100c08] font-semibold hover:bg-[#dfb780]"
+            >
+              + Add Suggestion
+            </button>
+          </div>
+        </div>
+
         {/* Submit */}
         <div className="flex justify-end pt-2">
           <button
