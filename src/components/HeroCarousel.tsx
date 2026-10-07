@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { resolveImage } from '../utils/imageResolver';
+import { MobileFixedLocationBar } from './mobile/MobileFixedLocationBar';
 
 export const HeroCarousel: React.FC = () => {
   const { banners } = useApp();
@@ -70,6 +71,9 @@ export const HeroCarousel: React.FC = () => {
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
+      {/* Mobile Location & Address Bar Overlaid on Hero Section */}
+      <MobileFixedLocationBar />
+
       {/* Banner Image Background */}
       <div className="absolute inset-0 z-0">
         <img

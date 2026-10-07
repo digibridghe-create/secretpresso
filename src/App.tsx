@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp } from './context/AppContext';
+import { useApp, AppProvider } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { HeroCarousel } from './components/HeroCarousel';
 import { CoffeeFlavoursGrid } from './components/CoffeeFlavoursGrid';
@@ -15,8 +15,6 @@ import { OurStoryView } from './components/OurStoryView';
 import { CartView } from './components/CartView';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ProductCustomizationModal } from './components/ProductCustomizationModal';
-import { FixedMobileTopControls } from './components/mobile/FixedMobileTopControls';
-import { MobileSearchBar } from './components/mobile/MobileSearchBar';
 import { BottomNav } from './components/mobile/BottomNav';
 import { AddressModal } from './components/mobile/AddressModal';
 import { OffersModal } from './components/mobile/OffersModal';
@@ -38,12 +36,13 @@ export const AppContent: React.FC = () => {
     editingCartItem,
     isCustomizationOpen,
     closeCustomizationModal,
+    isAddressModalOpen,
+    setIsAddressModalOpen,
+    isAccountModalOpen,
+    setIsAccountModalOpen,
+    isOffersModalOpen,
+    setIsOffersModalOpen,
   } = useApp();
-
-  // Mobile modal states
-  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
-  const [isOffersModalOpen, setIsOffersModalOpen] = useState(false);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -83,106 +82,7 @@ export const AppContent: React.FC = () => {
     );
   }
 
-  // Cart View
-  if (currentView === 'cart') {
-    return (
-      <div className="min-h-screen bg-[#FAF7F2] text-[#140F0B] relative pb-20">
-        <Navbar />
-        <FixedMobileTopControls
-          onOpenAddress={() => setIsAddressModalOpen(true)}
-          onOpenAccount={() => setIsAccountModalOpen(true)}
-        />
-        <CartView />
-        <Footer />
-        <CartDrawer />
-        <FloatingCartBar />
-        <BottomNav onOpenOffers={() => setIsOffersModalOpen(true)} />
-        <ProductCustomizationModal
-          product={customizingProduct}
-          existingCartItem={editingCartItem}
-          isOpen={isCustomizationOpen}
-          onClose={closeCustomizationModal}
-        />
-        <AddressModal isOpen={isAddressModalOpen} onClose={() => setIsAddressModalOpen(false)} />
-        <OffersModal isOpen={isOffersModalOpen} onClose={() => setIsOffersModalOpen(false)} />
-        <AccountModal
-          isOpen={isAccountModalOpen}
-          onClose={() => setIsAccountModalOpen(false)}
-          onOpenAddress={() => setIsAddressModalOpen(true)}
-        />
-        <ToastContainer toasts={toasts} dismissToast={dismissToast} />
-      </div>
-    );
-  }
-
-  // Track Order View
-  if (currentView === 'track-order') {
-    return (
-      <div className="min-h-screen bg-[#0d0a08] text-[#f5f0eb] relative pb-20">
-        <Navbar />
-        <FixedMobileTopControls
-          onOpenAddress={() => setIsAddressModalOpen(true)}
-          onOpenAccount={() => setIsAccountModalOpen(true)}
-        />
-        <TrackOrderView />
-        <Footer />
-        <FloatingCartBar />
-        <CartDrawer />
-        <CheckoutModal />
-        <BottomNav onOpenOffers={() => setIsOffersModalOpen(true)} />
-        <ProductCustomizationModal
-          product={customizingProduct}
-          existingCartItem={editingCartItem}
-          isOpen={isCustomizationOpen}
-          onClose={closeCustomizationModal}
-        />
-        <AddressModal isOpen={isAddressModalOpen} onClose={() => setIsAddressModalOpen(false)} />
-        <OffersModal isOpen={isOffersModalOpen} onClose={() => setIsOffersModalOpen(false)} />
-        <AccountModal
-          isOpen={isAccountModalOpen}
-          onClose={() => setIsAccountModalOpen(false)}
-          onOpenAddress={() => setIsAddressModalOpen(true)}
-        />
-        <ToastContainer toasts={toasts} dismissToast={dismissToast} />
-      </div>
-    );
-  }
-
-  // Our Story View
-  if (currentView === 'our-story') {
-    return (
-      <div className="min-h-screen bg-[#0d0a08] text-[#f5f0eb] relative pb-20">
-        <Navbar />
-        <FixedMobileTopControls
-          onOpenAddress={() => setIsAddressModalOpen(true)}
-          onOpenAccount={() => setIsAccountModalOpen(true)}
-        />
-        <OurStoryView />
-        <Footer />
-        <FloatingCartBar />
-        <CartDrawer />
-        <CheckoutModal />
-        <FloatingOrderBar />
-        <BottomNav onOpenOffers={() => setIsOffersModalOpen(true)} />
-        <ProductCustomizationModal
-          product={customizingProduct}
-          existingCartItem={editingCartItem}
-          isOpen={isCustomizationOpen}
-          onClose={closeCustomizationModal}
-        />
-        <AddressModal isOpen={isAddressModalOpen} onClose={() => setIsAddressModalOpen(false)} />
-        <OffersModal isOpen={isOffersModalOpen} onClose={() => setIsOffersModalOpen(false)} />
-        <AccountModal
-          isOpen={isAccountModalOpen}
-          onClose={() => setIsAccountModalOpen(false)}
-          onOpenAddress={() => setIsAddressModalOpen(true)}
-        />
-        <ToastContainer toasts={toasts} dismissToast={dismissToast} />
-      </div>
-    );
-  }
-
-  // Homepage View
+  // Homepage sections computation
   const visibleNonCoffeeSections = sections
     .filter((sec) => sec.isVisible && sec.id !== 'sec-coffee-flavours')
     .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
@@ -199,46 +99,32 @@ export const AppContent: React.FC = () => {
       {/* Desktop Navbar */}
       <Navbar />
 
-      {/* Fixed Mobile Top Controls (Location + Account) */}
-      <FixedMobileTopControls
-        onOpenAddress={() => setIsAddressModalOpen(true)}
-        onOpenAccount={() => setIsAccountModalOpen(true)}
-      />
+      {/* View Content Routing */}
+      {currentView === 'cart' && <CartView />}
+      {currentView === 'track-order' && <TrackOrderView />}
+      {currentView === 'our-story' && <OurStoryView />}
+      {currentView === 'home' && (
+        <>
+          <HeroCarousel />
+          <CoffeeFlavoursGrid />
+          {initialFoodSections.map((sec) => {
+            const secProducts = products.filter((p) => p.isVisible && p.sectionId === sec.id);
+            return <DynamicSection key={sec.id} section={sec} products={secProducts} />;
+          })}
+          <PromotionalBanner />
+          {futureAdminSections.map((sec) => {
+            const secProducts = products.filter((p) => p.isVisible && p.sectionId === sec.id);
+            return <DynamicSection key={sec.id} section={sec} products={secProducts} />;
+          })}
+        </>
+      )}
 
-      {/* Mobile Search Bar in Normal Flow */}
-      <MobileSearchBar />
-
-      {/* Auto-sliding Hero Banner Carousel */}
-      <HeroCarousel />
-
-      {/* Coffee Flavours (GRID) */}
-      <CoffeeFlavoursGrid />
-
-      {/* Initial Food Sections */}
-      {initialFoodSections.map((sec) => {
-        const secProducts = products.filter((p) => p.isVisible && p.sectionId === sec.id);
-        return <DynamicSection key={sec.id} section={sec} products={secProducts} />;
-      })}
-
-      {/* Premium Full-Width Promotional Banner */}
-      <PromotionalBanner />
-
-      {/* Future Admin Sections */}
-      {futureAdminSections.map((sec) => {
-        const secProducts = products.filter((p) => p.isVisible && p.sectionId === sec.id);
-        return <DynamicSection key={sec.id} section={sec} products={secProducts} />;
-      })}
-
-      {/* Luxury Editorial Dark Footer */}
+      {/* Shared Footer & Floating Elements */}
       <Footer />
-
-      {/* Floating Components */}
       <FloatingCartBar />
       <CartDrawer />
       <CheckoutModal />
       <FloatingOrderBar />
-
-      {/* Mobile Bottom Navigation */}
       <BottomNav onOpenOffers={() => setIsOffersModalOpen(true)} />
 
       {/* Modals */}
@@ -249,8 +135,6 @@ export const AppContent: React.FC = () => {
         onClose={() => setIsAccountModalOpen(false)}
         onOpenAddress={() => setIsAddressModalOpen(true)}
       />
-
-      {/* Product Customization Modal */}
       <ProductCustomizationModal
         product={customizingProduct}
         existingCartItem={editingCartItem}
@@ -303,7 +187,9 @@ const ToastContainer: React.FC<{
 export default function App() {
   return (
     <React.StrictMode>
-      <AppContent />
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
     </React.StrictMode>
   );
 }

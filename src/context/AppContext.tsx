@@ -81,6 +81,14 @@ interface AppContextType {
   toasts: ToastItem[];
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   dismissToast: (id: string) => void;
+
+  // Modals
+  isAddressModalOpen: boolean;
+  setIsAddressModalOpen: (open: boolean) => void;
+  isAccountModalOpen: boolean;
+  setIsAccountModalOpen: (open: boolean) => void;
+  isOffersModalOpen: boolean;
+  setIsOffersModalOpen: (open: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -114,6 +122,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentView, setCurrentView] = useState<AppView>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('cat-all');
+
+  // Modals
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isOffersModalOpen, setIsOffersModalOpen] = useState(false);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -356,6 +369,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toasts,
         showToast,
         dismissToast,
+        isAddressModalOpen,
+        setIsAddressModalOpen,
+        isAccountModalOpen,
+        setIsAccountModalOpen,
+        isOffersModalOpen,
+        setIsOffersModalOpen,
       }}
     >
       {children}
