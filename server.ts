@@ -6,12 +6,28 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const UPLOADS_DIR = path.resolve(DATA_DIR, 'uploads');
 const DB_FILE = path.resolve(DATA_DIR, 'db.json');
+
+// Supabase Backend Integration
+const SUPABASE_URL =
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  'https://ifarrpgcdutjzfprwksi.supabase.co';
+
+const SUPABASE_KEY =
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  'sb_publishable_oNHI9Mmzf-0w6Tuhf-q81w_AZyN5pUr';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Ensure storage directories exist
 if (!fs.existsSync(DATA_DIR)) {
@@ -1167,27 +1183,142 @@ app.delete('/api/media/:id', (req, res) => {
 });
 
 // Orders & Checkout API
-app.get('/api/orders', (_req, res) => {
+app.get('/api/orders', async (_req, res) => {
   const db = readDatabase();
+  try {
+    const { data: supaOrders, error } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && supaOrders && supaOrders.length > 0) {
+      const mapped = supaOrders.map((o: any) => {
+        let name = 'Customer';
+        let phone = '';
+        let email = '';
+        let address = '';
+        let note = '';
+        if (o.customer_note && typeof o.customer_note === 'string') {
+          const parts = o.customer_note.split(' | ');
+          const extra: string[] = [];
+          for (const part of parts) {
+            if (part.startsWith('Customer: ')) name = part.replace('Customer: ', '').trim();
+            else if (part.startsWith('Phone: ')) phone = part.replace('Phone: ', '').trim();
+            else if (part.startsWith('Email: ')) email = part.replace('Email: ', '').trim();
+            else if (part.startsWith('Address: ')) address = part.replace('Address: ', '').trim();
+            else if (part.startsWith('Note: ')) extra.push(part.replace('Note: ', '').trim());
+            else extra.push(part.trim());
+          }
+          note = extra.join(' | ');
+        }
+        return {
+          id: o.order_number || o.id,
+          customerName: name,
+          customerEmail: email,
+          customerPhone: phone,
+          deliveryAddress: address,
+          notes: note || undefined,
+          items: [],
+          subtotal: Number(o.subtotal || 0),
+          tax: Number(o.gst_amount || 0),
+          deliveryFee: Number(o.delivery_charge || 0),
+          total: Number(o.total_amount || 0),
+          status: o.status || 'preparing',
+          paymentMethod: o.payment_method?.toLowerCase().includes('upi') ? 'upi' : o.payment_method?.toLowerCase().includes('card') ? 'card' : 'cod',
+          createdAt: o.created_at,
+          updatedAt: o.updated_at,
+        };
+      });
+      return res.json({ success: true, data: mapped });
+    }
+  } catch (err) {
+    console.warn('Backend Supabase orders read notice, using local db:', err);
+  }
+
   const sorted = [...db.orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   res.json({ success: true, data: sorted });
 });
 
-app.get('/api/orders/:id', (req, res) => {
+app.get('/api/orders/:id', async (req, res) => {
   const db = readDatabase();
-  const order = db.orders.find((o) => o.id.toLowerCase() === req.params.id.toLowerCase());
+  const orderId = req.params.id;
+
+  // Try finding from Supabase
+  try {
+    const isUuid = orderId.length === 36 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+    const query = isUuid
+      ? supabase.from('orders').select('*').eq('id', orderId).maybeSingle()
+      : supabase.from('orders').select('*').eq('order_number', orderId).maybeSingle();
+    const { data: supaOrder } = await query;
+
+    if (supaOrder) {
+      let name = 'Customer';
+      let phone = '';
+      let email = '';
+      let address = '';
+      let note = '';
+      if (supaOrder.customer_note && typeof supaOrder.customer_note === 'string') {
+        const parts = supaOrder.customer_note.split(' | ');
+        const extra: string[] = [];
+        for (const part of parts) {
+          if (part.startsWith('Customer: ')) name = part.replace('Customer: ', '').trim();
+          else if (part.startsWith('Phone: ')) phone = part.replace('Phone: ', '').trim();
+          else if (part.startsWith('Email: ')) email = part.replace('Email: ', '').trim();
+          else if (part.startsWith('Address: ')) address = part.replace('Address: ', '').trim();
+          else if (part.startsWith('Note: ')) extra.push(part.replace('Note: ', '').trim());
+          else extra.push(part.trim());
+        }
+        note = extra.join(' | ');
+      }
+
+      const { data: itemsData } = await supabase.from('order_items').select('*').eq('order_id', supaOrder.id);
+
+      return res.json({
+        success: true,
+        data: {
+          id: supaOrder.order_number || supaOrder.id,
+          customerName: name,
+          customerEmail: email,
+          customerPhone: phone,
+          deliveryAddress: address,
+          notes: note || undefined,
+          items: (itemsData || []).map((it) => ({
+            productId: it.product_id || '',
+            name: it.product_name_snapshot,
+            price: Number(it.unit_price),
+            quantity: it.quantity,
+            image: it.product_image_snapshot || '',
+            selectedCustomizations: it.customization_data || [],
+            specialInstructions: it.special_instructions || undefined,
+          })),
+          subtotal: Number(supaOrder.subtotal || 0),
+          tax: Number(supaOrder.gst_amount || 0),
+          deliveryFee: Number(supaOrder.delivery_charge || 0),
+          total: Number(supaOrder.total_amount || 0),
+          status: supaOrder.status || 'preparing',
+          paymentMethod: supaOrder.payment_method?.toLowerCase().includes('upi') ? 'upi' : supaOrder.payment_method?.toLowerCase().includes('card') ? 'card' : 'cod',
+          createdAt: supaOrder.created_at,
+          updatedAt: supaOrder.updated_at,
+        },
+      });
+    }
+  } catch (err) {
+    console.warn('Backend Supabase single order read notice:', err);
+  }
+
+  const order = db.orders.find((o) => o.id.toLowerCase() === orderId.toLowerCase());
   if (!order) {
     return res.status(404).json({ success: false, error: 'Order not found' });
   }
   res.json({ success: true, data: order });
 });
 
-app.post('/api/orders', (req, res) => {
+app.post('/api/orders', async (req, res) => {
   const db = readDatabase();
   const now = new Date().toISOString();
   const orderNumber = 1000 + db.orders.length + 1;
   const newOrder = {
-    id: `ORD-${orderNumber}`,
+    id: req.body.id || `ORD-${orderNumber}`,
     customerName: req.body.customerName || 'Guest Customer',
     customerEmail: req.body.customerEmail || '',
     customerPhone: req.body.customerPhone || '',
@@ -1204,22 +1335,100 @@ app.post('/api/orders', (req, res) => {
     updatedAt: now,
   };
 
-  db.orders.unshift(newOrder);
+  // 1. Save to local database
+  const existingIdx = db.orders.findIndex((o) => o.id === newOrder.id);
+  if (existingIdx !== -1) {
+    db.orders[existingIdx] = { ...db.orders[existingIdx], ...newOrder, updatedAt: now };
+  } else {
+    db.orders.unshift(newOrder);
+  }
   writeDatabase(db);
+
+  // 2. Save directly to Supabase backend tables (orders and order_items)
+  try {
+    const customerName = newOrder.customerName;
+    const customerPhone = newOrder.customerPhone;
+    const customerEmail = newOrder.customerEmail;
+    const deliveryAddress = newOrder.deliveryAddress;
+    const rawNotes = newOrder.notes;
+    const fullNote = [
+      `Customer: ${customerName}`,
+      customerPhone ? `Phone: ${customerPhone}` : '',
+      customerEmail ? `Email: ${customerEmail}` : '',
+      deliveryAddress ? `Address: ${deliveryAddress}` : '',
+      rawNotes ? `Note: ${rawNotes}` : '',
+    ]
+      .filter(Boolean)
+      .join(' | ');
+
+    const paymentMethodStr =
+      newOrder.paymentMethod === 'upi'
+        ? 'UPI'
+        : newOrder.paymentMethod === 'card'
+        ? 'Credit / Debit Card'
+        : 'Cash on Delivery';
+
+    const paymentStatusStr = newOrder.paymentMethod === 'cod' ? 'pending' : 'paid';
+
+    const { data: supaOrder, error: supaErr } = await supabase
+      .from('orders')
+      .insert({
+        status: 'preparing',
+        subtotal: Number(newOrder.subtotal) || 0,
+        delivery_charge: Number(newOrder.deliveryFee) || 0,
+        gst_amount: Number(newOrder.tax) || 0,
+        total_amount: Number(newOrder.total) || 0,
+        payment_method: paymentMethodStr,
+        payment_status: paymentStatusStr,
+        customer_note: fullNote,
+      })
+      .select()
+      .single();
+
+    if (supaOrder) {
+      newOrder.id = supaOrder.order_number || supaOrder.id;
+      if (Array.isArray(newOrder.items) && newOrder.items.length > 0) {
+        const itemsPayload = newOrder.items.map((it: any) => ({
+          order_id: supaOrder.id,
+          product_name_snapshot: it.name || 'Brew Item',
+          product_image_snapshot: it.image || null,
+          quantity: Number(it.quantity) || 1,
+          unit_price: Number(it.price) || 0,
+          total_price: (Number(it.price) || 0) * (Number(it.quantity) || 1),
+          customization_data: it.selectedCustomizations || [],
+          special_instructions: it.specialInstructions || null,
+        }));
+        await supabase.from('order_items').insert(itemsPayload);
+      }
+    }
+  } catch (err) {
+    console.warn('Backend Supabase order persistence notice:', err);
+  }
+
   res.status(201).json({ success: true, data: newOrder });
 });
 
-app.put('/api/orders/:id/status', (req, res) => {
+app.put('/api/orders/:id/status', async (req, res) => {
   const db = readDatabase();
   const order = db.orders.find((o) => o.id === req.params.id);
-  if (!order) {
-    return res.status(404).json({ success: false, error: 'Order not found' });
+  if (order) {
+    order.status = req.body.status || order.status;
+    order.updatedAt = new Date().toISOString();
+    writeDatabase(db);
   }
 
-  order.status = req.body.status || order.status;
-  order.updatedAt = new Date().toISOString();
-  writeDatabase(db);
-  res.json({ success: true, data: order });
+  try {
+    const isUuid = req.params.id.length === 36 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id);
+    if (isUuid) {
+      await supabase.from('orders').update({ status: req.body.status, updated_at: new Date().toISOString() }).eq('id', req.params.id);
+    } else {
+      await supabase.from('orders').update({ status: req.body.status, updated_at: new Date().toISOString() }).eq('order_number', req.params.id);
+    }
+  } catch (err) {
+    console.warn('Backend Supabase status update notice:', err);
+  }
+
+  res.json({ success: true, data: order || { id: req.params.id, status: req.body.status } });
 });
 
 // Vite Middleware integration for development

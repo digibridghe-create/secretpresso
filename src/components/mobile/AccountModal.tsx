@@ -58,6 +58,46 @@ export const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, onO
       }
 
       if (data.user) {
+        try {
+          const { data: p } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .maybeSingle();
+
+          if (p) {
+            setUserProfile({
+              id: p.id,
+              name: p.full_name || data.user.email?.split('@')[0] || 'Customer',
+              email: p.email || data.user.email || '',
+              phone: p.phone || '',
+              avatarUrl: p.avatar_url || '',
+              role: p.role || 'customer',
+            });
+          } else {
+            const fallbackName = data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'Customer';
+            const fallbackPhone = data.user.user_metadata?.phone || '';
+            await supabase.from('profiles').upsert({
+              id: data.user.id,
+              full_name: fallbackName,
+              email: data.user.email || '',
+              phone: fallbackPhone,
+              role: 'customer',
+              is_active: true,
+              updated_at: new Date().toISOString(),
+            });
+
+            setUserProfile({
+              id: data.user.id,
+              name: fallbackName,
+              email: data.user.email || '',
+              phone: fallbackPhone,
+              role: (data.user.user_metadata?.role as any) || 'customer',
+            });
+          }
+        } catch {
+          // Metadata fallback
+        }
         showToast('Signed in to SECRETpresso', 'success');
         onClose();
       }
@@ -102,6 +142,35 @@ export const AccountModal: React.FC<AccountModalProps> = ({ isOpen, onClose, onO
       }
 
       if (data.user) {
+        // Ensure customer record is saved in public.profiles table
+        try {
+          const { error: updateErr } = await supabase
+            .from('profiles')
+            .update({
+              full_name: fullName.trim(),
+              email: email.trim(),
+              phone: phone.trim(),
+              role: 'customer',
+              is_active: true,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', data.user.id);
+
+          if (updateErr) {
+            await supabase.from('profiles').upsert({
+              id: data.user.id,
+              full_name: fullName.trim(),
+              email: email.trim(),
+              phone: phone.trim(),
+              role: 'customer',
+              is_active: true,
+              updated_at: new Date().toISOString(),
+            });
+          }
+        } catch (profileErr) {
+          console.warn('Profile sync notice:', profileErr);
+        }
+
         showToast('Account created successfully!', 'success');
         setUserProfile({
           id: data.user.id,

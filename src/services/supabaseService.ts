@@ -14,28 +14,73 @@ import {
 // Detect if Supabase table is accessible
 async function canQueryTable(tableName: string): Promise<boolean> {
   try {
-    const { error } = await supabase.from(tableName as any).select('id').limit(1);
-    if (!error) return true;
-    if (error.code === 'PGRST205') {
-      // Table not yet created in Supabase schema cache
-      return false;
-    }
-    // Other errors (e.g., empty or auth) mean the table exists
-    return true;
+    const queryPromise = supabase.from(tableName as any).select('id').limit(1);
+    const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((_, reject) =>
+      setTimeout(() => reject(new Error('Supabase request timeout')), 3000)
+    );
+    const { data, error } = (await Promise.race([queryPromise, timeoutPromise])) as any;
+    if (!error && Array.isArray(data)) return true;
+    return false;
   } catch {
     return false;
   }
+}
+
+function parseCustomerDetails(orderRow: any) {
+  let name = orderRow.customer_name || '';
+  let phone = orderRow.customer_phone || '';
+  let email = orderRow.customer_email || '';
+  let address = orderRow.delivery_address || '';
+  let notes = '';
+
+  if (orderRow.customer_note && typeof orderRow.customer_note === 'string') {
+    const parts = orderRow.customer_note.split(' | ');
+    const noteParts: string[] = [];
+    for (const part of parts) {
+      if (part.startsWith('Customer: ') && !name) {
+        name = part.replace('Customer: ', '').trim();
+      } else if (part.startsWith('Phone: ') && !phone) {
+        phone = part.replace('Phone: ', '').trim();
+      } else if (part.startsWith('Email: ') && !email) {
+        email = part.replace('Email: ', '').trim();
+      } else if (part.startsWith('Address: ') && !address) {
+        address = part.replace('Address: ', '').trim();
+      } else if (part.startsWith('Note: ')) {
+        noteParts.push(part.replace('Note: ', '').trim());
+      } else {
+        noteParts.push(part.trim());
+      }
+    }
+    notes = noteParts.join(' | ');
+  } else if (orderRow.customer_note) {
+    notes = String(orderRow.customer_note);
+  }
+
+  return {
+    name: name || 'Customer',
+    phone: phone || '',
+    email: email || '',
+    address: address || 'Bengaluru, India',
+    notes: notes || undefined,
+  };
 }
 
 export const supabaseService = {
   // Check if Supabase cloud tables are online
   async checkConnection(): Promise<{ connected: boolean; tablesExist: boolean }> {
     try {
-      const { data, error } = await supabase.from('products' as any).select('id').limit(1);
+      const queryPromise = supabase.from('products' as any).select('id').limit(1);
+      const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase request timeout')), 1200)
+      );
+      const { data, error } = (await Promise.race([queryPromise, timeoutPromise])) as any;
       if (error && error.code === 'PGRST205') {
         return { connected: true, tablesExist: false };
       }
-      return { connected: true, tablesExist: true };
+      if (!error && Array.isArray(data)) {
+        return { connected: true, tablesExist: true };
+      }
+      return { connected: false, tablesExist: false };
     } catch {
       return { connected: false, tablesExist: false };
     }
@@ -781,23 +826,26 @@ export const supabaseService = {
         .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        return data.map((o) => ({
-          id: o.order_number || o.id,
-          customerName: o.customer_name || 'Guest',
-          customerEmail: o.customer_email || '',
-          customerPhone: o.customer_phone || '',
-          deliveryAddress: o.delivery_address,
-          notes: o.customer_note || undefined,
-          items: [], // loaded separately or cached
-          subtotal: Number(o.subtotal),
-          tax: Number(o.gst),
-          deliveryFee: Number(o.delivery_fee),
-          total: Number(o.grand_total),
-          status: o.status as any,
-          paymentMethod: o.payment_method,
-          createdAt: o.created_at,
-          updatedAt: o.updated_at,
-        }));
+        return data.map((o) => {
+          const cust = parseCustomerDetails(o);
+          return {
+            id: o.order_number || o.id,
+            customerName: cust.name,
+            customerEmail: cust.email,
+            customerPhone: cust.phone,
+            deliveryAddress: cust.address,
+            notes: cust.notes,
+            items: [], // loaded individually when querying single order
+            subtotal: Number(o.subtotal || 0),
+            tax: Number(o.gst_amount ?? o.gst ?? 0),
+            deliveryFee: Number(o.delivery_charge ?? o.delivery_fee ?? 0),
+            total: Number(o.total_amount ?? o.grand_total ?? 0),
+            status: o.status as any,
+            paymentMethod: o.payment_method,
+            createdAt: o.created_at,
+            updatedAt: o.updated_at,
+          };
+        });
       }
     }
 
@@ -809,13 +857,15 @@ export const supabaseService = {
   async getOrder(id: string): Promise<Order> {
     const isReady = await canQueryTable('orders');
     if (isReady) {
-      const { data: orderData, error } = await supabase
-        .from('orders')
-        .select('*')
-        .or(`id.eq.${id},order_number.eq.${id}`)
-        .maybeSingle();
+      const isUuid = id.length === 36 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const query = isUuid
+        ? supabase.from('orders').select('*').eq('id', id).maybeSingle()
+        : supabase.from('orders').select('*').eq('order_number', id).maybeSingle();
+
+      const { data: orderData, error } = await query;
 
       if (!error && orderData) {
+        const cust = parseCustomerDetails(orderData);
         // Fetch order items snapshots
         const { data: itemsData } = await supabase
           .from('order_items')
@@ -824,24 +874,24 @@ export const supabaseService = {
 
         return {
           id: orderData.order_number || orderData.id,
-          customerName: orderData.customer_name || 'Customer',
-          customerEmail: orderData.customer_email || '',
-          customerPhone: orderData.customer_phone || '',
-          deliveryAddress: orderData.delivery_address,
-          notes: orderData.customer_note || undefined,
+          customerName: cust.name,
+          customerEmail: cust.email,
+          customerPhone: cust.phone,
+          deliveryAddress: cust.address,
+          notes: cust.notes,
           items: (itemsData || []).map((it) => ({
             productId: it.product_id || '',
             name: it.product_name_snapshot,
             price: Number(it.unit_price),
             quantity: it.quantity,
             image: it.product_image_snapshot || '',
-            selectedCustomizations: it.selected_options_snapshot || [],
+            selectedCustomizations: it.customization_data || it.selected_options_snapshot || [],
             specialInstructions: it.special_instructions || undefined,
           })),
-          subtotal: Number(orderData.subtotal),
-          tax: Number(orderData.gst),
-          deliveryFee: Number(orderData.delivery_fee),
-          total: Number(orderData.grand_total),
+          subtotal: Number(orderData.subtotal || 0),
+          tax: Number(orderData.gst_amount ?? orderData.gst ?? 0),
+          deliveryFee: Number(orderData.delivery_charge ?? orderData.delivery_fee ?? 0),
+          total: Number(orderData.total_amount ?? orderData.grand_total ?? 0),
           status: orderData.status as any,
           paymentMethod: orderData.payment_method,
           createdAt: orderData.created_at,
@@ -859,70 +909,196 @@ export const supabaseService = {
   async createOrder(orderData: Partial<Order>): Promise<Order> {
     const isReady = await canQueryTable('orders');
     if (isReady) {
-      const orderNumber = `ORD-${Date.now().toString().slice(-4)}`;
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      const { data: createdOrder, error } = await supabase
-        .from('orders')
-        .insert({
-          user_id: user?.id || null,
-          order_number: orderNumber,
-          status: 'preparing',
-          subtotal: Number(orderData.subtotal) || 0,
-          discount: 0,
-          coupon_discount: 0,
-          delivery_fee: Number(orderData.deliveryFee) || 0,
-          gst: Number(orderData.tax) || 0,
-          grand_total: Number(orderData.total) || 0,
-          payment_method: orderData.paymentMethod || 'cod',
-          payment_status: orderData.paymentMethod === 'cod' ? 'pending' : 'completed',
-          delivery_address: orderData.deliveryAddress || 'Bengaluru, India',
-          customer_name: orderData.customerName || 'Customer',
-          customer_email: orderData.customerEmail || '',
-          customer_phone: orderData.customerPhone || '',
-          customer_note: orderData.notes || '',
-        })
-        .select()
-        .single();
+        const customerName = orderData.customerName || 'Customer';
+        const customerPhone = orderData.customerPhone || '';
+        const customerEmail = orderData.customerEmail || '';
+        const deliveryAddress = orderData.deliveryAddress || 'Bengaluru, India';
+        const rawNotes = orderData.notes || '';
 
-      if (!error && createdOrder) {
-        // Insert order items snapshots
-        if (orderData.items && orderData.items.length > 0) {
-          const orderItemsPayload = orderData.items.map((it) => ({
-            order_id: createdOrder.id,
-            product_id: it.productId || null,
-            product_name_snapshot: it.name,
-            product_image_snapshot: it.image,
-            quantity: it.quantity,
-            unit_price: Number(it.price),
-            customization_snapshot: it.selectedCustomizations || [],
-            selected_options_snapshot: it.selectedCustomizations || [],
-            special_instructions: it.specialInstructions || null,
-            item_total: Number(it.price) * it.quantity,
-          }));
+        const fullNote = [
+          `Customer: ${customerName}`,
+          customerPhone ? `Phone: ${customerPhone}` : '',
+          customerEmail ? `Email: ${customerEmail}` : '',
+          deliveryAddress ? `Address: ${deliveryAddress}` : '',
+          rawNotes ? `Note: ${rawNotes}` : '',
+        ]
+          .filter(Boolean)
+          .join(' | ');
 
-          await supabase.from('order_items').insert(orderItemsPayload);
+        // If customer is signed in, save/link their address in addresses table and update profile
+        let linkedAddressId: string | null = null;
+        if (user?.id && deliveryAddress) {
+          try {
+            const { data: addrData } = await supabase
+              .from('addresses')
+              .insert({
+                user_id: user.id,
+                label: 'Order Delivery Address',
+                full_address: deliveryAddress,
+                is_default: true,
+              })
+              .select('id')
+              .single();
+            if (addrData?.id) {
+              linkedAddressId = addrData.id;
+            }
+          } catch (addrErr) {
+            console.warn('Addresses sync notice:', addrErr);
+          }
         }
 
-        return {
-          id: createdOrder.order_number,
-          customerName: createdOrder.customer_name || 'Customer',
-          customerEmail: createdOrder.customer_email || '',
-          customerPhone: createdOrder.customer_phone || '',
-          deliveryAddress: createdOrder.delivery_address,
-          notes: createdOrder.customer_note || undefined,
-          items: orderData.items || [],
-          subtotal: Number(createdOrder.subtotal),
-          tax: Number(createdOrder.gst),
-          deliveryFee: Number(createdOrder.delivery_fee),
-          total: Number(createdOrder.grand_total),
+        if (user?.id) {
+          try {
+            await supabase
+              .from('profiles')
+              .update({
+                full_name: customerName,
+                phone: customerPhone || undefined,
+                email: customerEmail || undefined,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', user.id);
+          } catch (profileErr) {
+            console.warn('Profile sync on order notice:', profileErr);
+          }
+        }
+
+        const paymentMethodStr =
+          orderData.paymentMethod === 'upi'
+            ? 'UPI'
+            : orderData.paymentMethod === 'card'
+            ? 'Credit / Debit Card'
+            : 'Cash on Delivery';
+
+        const paymentStatusStr = orderData.paymentMethod === 'cod' ? 'pending' : 'paid';
+
+        // Primary insert matching live Supabase backend schema
+        const orderPayload: any = {
+          user_id: user?.id || null,
+          address_id: linkedAddressId,
           status: 'preparing',
-          paymentMethod: createdOrder.payment_method,
-          createdAt: createdOrder.created_at,
-          updatedAt: createdOrder.updated_at,
+          subtotal: Number(orderData.subtotal) || 0,
+          discount_amount: Number((orderData as any).discount || 0),
+          coupon_discount: Number((orderData as any).couponDiscount || 0),
+          delivery_charge: Number(orderData.deliveryFee) || 0,
+          gst_amount: Number(orderData.tax) || 0,
+          total_amount: Number(orderData.total) || 0,
+          payment_method: paymentMethodStr,
+          payment_status: paymentStatusStr,
+          customer_note: fullNote,
         };
+
+        let createdOrder: any = null;
+        const { data: inserted, error: orderError } = await supabase
+          .from('orders')
+          .insert(orderPayload)
+          .select()
+          .single();
+
+        if (orderError) {
+          console.warn('Supabase order creation primary schema error, trying alternate schema:', orderError.message);
+          // Fallback schema if table has alternative column names
+          const altPayload: any = {
+            user_id: user?.id || null,
+            order_number: `ORD-${Date.now().toString().slice(-4)}`,
+            status: 'preparing',
+            subtotal: Number(orderData.subtotal) || 0,
+            discount: 0,
+            coupon_discount: 0,
+            delivery_fee: Number(orderData.deliveryFee) || 0,
+            gst: Number(orderData.tax) || 0,
+            grand_total: Number(orderData.total) || 0,
+            payment_method: orderData.paymentMethod || 'cod',
+            payment_status: orderData.paymentMethod === 'cod' ? 'pending' : 'completed',
+            delivery_address: deliveryAddress,
+            customer_name: customerName,
+            customer_email: customerEmail,
+            customer_phone: customerPhone,
+            customer_note: rawNotes,
+          };
+          const { data: altInserted } = await supabase
+            .from('orders')
+            .insert(altPayload)
+            .select()
+            .single();
+
+          if (altInserted) {
+            createdOrder = altInserted;
+          }
+        } else {
+          createdOrder = inserted;
+        }
+
+        if (createdOrder) {
+          // Insert order items snapshots
+          if (orderData.items && orderData.items.length > 0) {
+            const itemsPayload = orderData.items.map((it) => ({
+              order_id: createdOrder.id,
+              product_id: it.productId?.length === 36 ? it.productId : null,
+              product_name_snapshot: it.name,
+              product_image_snapshot: it.image || null,
+              quantity: it.quantity,
+              unit_price: Number(it.price),
+              total_price: Number(it.price) * it.quantity,
+              customization_data: it.selectedCustomizations || [],
+              special_instructions: it.specialInstructions || null,
+            }));
+
+            const { error: itemsError } = await supabase.from('order_items').insert(itemsPayload);
+            if (itemsError) {
+              console.warn('Could not insert order_items to Supabase:', itemsError.message);
+            }
+          }
+
+          // If customer is signed in, also save/link their address in addresses table
+          if (user?.id && deliveryAddress) {
+            supabase
+              .from('addresses')
+              .insert({
+                user_id: user.id,
+                label: 'Recent Delivery Address',
+                full_address: deliveryAddress,
+                is_default: true,
+              })
+              .then(() => {})
+              .catch(() => {});
+          }
+
+          // Mirror order to local server as backup
+          fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...orderData,
+              id: createdOrder.order_number,
+            }),
+          }).catch(() => {});
+
+          return {
+            id: createdOrder.order_number || createdOrder.id,
+            customerName,
+            customerEmail,
+            customerPhone,
+            deliveryAddress,
+            notes: rawNotes || undefined,
+            items: orderData.items || [],
+            subtotal: Number(createdOrder.subtotal || orderData.subtotal || 0),
+            tax: Number(createdOrder.gst_amount ?? createdOrder.gst ?? orderData.tax ?? 0),
+            deliveryFee: Number(createdOrder.delivery_charge ?? createdOrder.delivery_fee ?? orderData.deliveryFee ?? 0),
+            total: Number(createdOrder.total_amount ?? createdOrder.grand_total ?? orderData.total ?? 0),
+            status: createdOrder.status as any,
+            paymentMethod: createdOrder.payment_method || orderData.paymentMethod || 'cod',
+            createdAt: createdOrder.created_at,
+            updatedAt: createdOrder.updated_at,
+          };
+        }
+      } catch (err) {
+        console.error('Supabase createOrder error, falling back to local server:', err);
       }
     }
 
@@ -939,10 +1115,18 @@ export const supabaseService = {
   async updateOrderStatus(id: string, status: string): Promise<Order> {
     const isReady = await canQueryTable('orders');
     if (isReady) {
-      await supabase
-        .from('orders')
-        .update({ status: status as any, updated_at: new Date().toISOString() })
-        .or(`id.eq.${id},order_number.eq.${id}`);
+      const isUuid = id.length === 36 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        await supabase
+          .from('orders')
+          .update({ status: status as any, updated_at: new Date().toISOString() })
+          .eq('id', id);
+      } else {
+        await supabase
+          .from('orders')
+          .update({ status: status as any, updated_at: new Date().toISOString() })
+          .eq('order_number', id);
+      }
     }
 
     const res = await fetch(`/api/orders/${encodeURIComponent(id)}/status`, {

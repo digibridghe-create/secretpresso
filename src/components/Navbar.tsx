@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
   X,
   ShoppingBag,
+  User,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -24,6 +25,8 @@ export const Navbar: React.FC = () => {
     cartCount,
     setIsCartOpen,
     activeOrder,
+    userProfile,
+    setIsAccountModalOpen,
   } = useApp();
 
   const [isSecretMenuOpen, setIsSecretMenuOpen] = useState(false);
@@ -155,6 +158,24 @@ export const Navbar: React.FC = () => {
                     {activeOrder ? 'Welcome Back!' : 'Collector & Coffee Connoisseur'}
                   </p>
                 </div>
+
+                <button
+                  onClick={() => {
+                    setIsSecretMenuOpen(false);
+                    setIsAccountModalOpen(true);
+                  }}
+                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-[#251e18] hover:text-[#e4be88] transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <User className="w-4 h-4 text-[#c59c6b]" />
+                    <span>{userProfile ? `Account (${userProfile.name})` : 'Sign In / Register'}</span>
+                  </div>
+                  {userProfile && (
+                    <span className="text-[10px] text-[#e0b985] font-medium bg-[#3a2c20] px-1.5 py-0.5 rounded">
+                      {userProfile.role}
+                    </span>
+                  )}
+                </button>
 
                 <button
                   onClick={() => handleNavClick('track-order')}
@@ -298,6 +319,18 @@ export const Navbar: React.FC = () => {
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#c89b63] text-[#120d09] text-[9px] font-bold flex items-center justify-center shadow-xs">
                 {cartCount}
               </span>
+            )}
+          </button>
+
+          {/* User Account / Profile Button */}
+          <button
+            onClick={() => setIsAccountModalOpen(true)}
+            title={userProfile ? `Account: ${userProfile.name}` : 'Sign In / Register'}
+            className="w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-xl border border-white/30 hover:border-white bg-white/5 backdrop-blur-sm flex items-center justify-center text-white transition-colors relative focus:outline-none shrink-0"
+          >
+            <User className="w-4 h-4 stroke-[1.8]" />
+            {userProfile && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#100c08]" />
             )}
           </button>
 

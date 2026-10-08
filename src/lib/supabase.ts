@@ -691,6 +691,9 @@ export function subscribeToSupabaseOrder(
   orderId: string,
   onStatusChange: (status: string, updatedOrder?: any) => void
 ) {
+  const isUuid = orderId.length === 36 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+  const filter = isUuid ? `id=eq.${orderId}` : `order_number=eq.${orderId}`;
+
   const channel = supabase
     .channel(`order-${orderId}`)
     .on(
@@ -699,7 +702,7 @@ export function subscribeToSupabaseOrder(
         event: 'UPDATE',
         schema: 'public',
         table: 'orders',
-        filter: `id=eq.${orderId}`,
+        filter,
       },
       (payload) => {
         if (payload.new && (payload.new as any).status) {

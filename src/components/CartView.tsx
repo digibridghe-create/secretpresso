@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ShoppingBag,
   Trash2,
@@ -128,6 +128,42 @@ export const CartView: React.FC = () => {
   // Order submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [placedOrderResult, setPlacedOrderResult] = useState<any | null>(null);
+
+  // Dynamic bottom offset calculation for mobile floating Proceed action bar to sit 8–12px above BottomNav
+  const [navBottomOffset, setNavBottomOffset] = useState<number | null>(null);
+
+  useEffect(() => {
+    const calculateNavOffset = () => {
+      // Find the mobile floating navigation element
+      const navElement = document.querySelector('nav[aria-label="Mobile Floating Navigation"]');
+      if (navElement) {
+        const rect = navElement.getBoundingClientRect();
+        // Distance from bottom of viewport to the top edge of the navigation bar
+        const distanceToNavTop = window.innerHeight - rect.top;
+        if (distanceToNavTop > 0) {
+          // Sit approximately 8–12px (10px) above the navigation bar
+          setNavBottomOffset(Math.round(distanceToNavTop + 10));
+          return;
+        }
+      }
+      setNavBottomOffset(null);
+    };
+
+    calculateNavOffset();
+    window.addEventListener('resize', calculateNavOffset);
+    window.addEventListener('orientationchange', calculateNavOffset);
+
+    // Initial checks after DOM settles
+    const timer1 = setTimeout(calculateNavOffset, 60);
+    const timer2 = setTimeout(calculateNavOffset, 200);
+
+    return () => {
+      window.removeEventListener('resize', calculateNavOffset);
+      window.removeEventListener('orientationchange', calculateNavOffset);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, []);
 
   // Horizontal slider ref
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -363,7 +399,7 @@ export const CartView: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FBF8F4] text-[#140F0B] pt-20 sm:pt-24 pb-32 sm:pb-20 px-3 sm:px-6 selection:bg-[#C89B63] selection:text-white">
+    <div className="min-h-screen bg-[#FBF8F4] text-[#140F0B] pt-20 sm:pt-24 pb-44 md:pb-28 lg:pb-20 px-3 sm:px-6 selection:bg-[#C89B63] selection:text-white">
       <div className="max-w-4xl mx-auto space-y-4 sm:space-y-5">
         
         {/* TOP BAR / NAVIGATION */}
@@ -1324,10 +1360,65 @@ export const CartView: React.FC = () => {
         )}
       </div>
 
-      {/* MOBILE STICKY CHECKOUT BOTTOM BAR (Fixed at bottom on mobile) */}
+      {/* MOBILE FLOATING PROCEED TO ORDER ACTION BAR (md:hidden) — Sits 8–12px directly above bottom navigation bar */}
+      {cart.length > 0 && !placedOrderResult && (
+        <aside
+          aria-label="Mobile Order Proceed Action Bar"
+          className="md:hidden fixed z-40 bg-[#FAF7F2]/95 backdrop-blur-md border border-[#E5DBCC]/90 rounded-full shadow-[0_8px_28px_rgba(0,0,0,0.12)] p-1.5 pl-3.5 sm:pl-4 flex items-center justify-between gap-2.5 sm:gap-3 transition-all animate-in fade-in slide-in-from-bottom-2 duration-200"
+          style={{
+            position: 'fixed',
+            left: 'max(14px, env(safe-area-inset-left, 14px))',
+            right: 'max(14px, env(safe-area-inset-right, 14px))',
+            bottom: navBottomOffset
+              ? `${navBottomOffset}px`
+              : 'max(76px, calc(env(safe-area-inset-bottom, 0px) + 72px))',
+            maxWidth: '520px',
+            margin: '0 auto',
+          }}
+        >
+          {/* Left: Order Total & Item Info */}
+          <div className="flex flex-col text-left min-w-0 pr-1">
+            <div className="flex items-center gap-1.5 leading-none">
+              <span className="text-[9px] uppercase tracking-wider font-bold text-[#8C7A6B]">
+                Total
+              </span>
+              <span className="text-[10px] text-[#A89584]">·</span>
+              <span className="text-[10px] text-[#7A6E64] font-medium truncate">
+                {cart.reduce((s, i) => s + i.quantity, 0)} {cart.reduce((s, i) => s + i.quantity, 0) === 1 ? 'item' : 'items'}
+              </span>
+            </div>
+            <div className="font-serif font-bold text-base sm:text-lg text-[#140F0B] leading-tight mt-0.5">
+              {currencySymbol}{finalGrandTotal.toFixed(2)}
+            </div>
+          </div>
+
+          {/* Right: Proceed to Order CTA Button */}
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={handlePlaceOrder}
+            className="py-2.5 px-4 sm:px-5 rounded-full bg-[#140F0B] hover:bg-[#2A1F17] text-white font-serif font-bold text-xs sm:text-sm tracking-wide flex items-center justify-center gap-1.5 sm:gap-2 transition-all shadow-md active:scale-98 disabled:opacity-50 cursor-pointer shrink-0"
+            aria-label={`Proceed to Order for ${currencySymbol}${finalGrandTotal.toFixed(2)}`}
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Placing...</span>
+              </>
+            ) : (
+              <>
+                <span>Proceed to Order</span>
+                <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#C89B63]" />
+              </>
+            )}
+          </button>
+        </aside>
+      )}
+
+      {/* TABLET STICKY CHECKOUT BOTTOM BAR (hidden md:block lg:hidden) — Kept 100% intact for Tablet */}
       {cart.length > 0 && !placedOrderResult && (
         <div
-          className="lg:hidden fixed z-40 left-0 right-0 bg-white/98 backdrop-blur-md border-t border-[#EAE3D7] px-4 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] animate-in slide-in-from-bottom-2 duration-200"
+          className="hidden md:block lg:hidden fixed z-40 left-0 right-0 bg-white/98 backdrop-blur-md border-t border-[#EAE3D7] px-4 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] animate-in slide-in-from-bottom-2 duration-200"
           style={{
             bottom: '0px',
             paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))',
