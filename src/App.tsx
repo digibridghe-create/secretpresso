@@ -13,13 +13,12 @@ import { TrackOrderView } from './components/TrackOrderView';
 import { OurStoryView } from './components/OurStoryView';
 import { CartView } from './components/CartView';
 import { AdminDashboard } from './components/admin/AdminDashboard';
-import { CustomerAuthView } from './components/CustomerAuthView';
 import { ProductCustomizationModal } from './components/ProductCustomizationModal';
+import { CustomerAuthModal } from './components/CustomerAuthModal';
 import { BottomNav } from './components/mobile/BottomNav';
 import { MobileTopAddressBar } from './components/mobile/MobileTopAddressBar';
 import { AddressModal } from './components/mobile/AddressModal';
 import { OffersModal } from './components/mobile/OffersModal';
-import { AccountModal } from './components/mobile/AccountModal';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 export const AppContent: React.FC = () => {
@@ -39,8 +38,8 @@ export const AppContent: React.FC = () => {
     closeCustomizationModal,
     isAddressModalOpen,
     setIsAddressModalOpen,
-    isAccountModalOpen,
-    setIsAccountModalOpen,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
     isOffersModalOpen,
     setIsOffersModalOpen,
   } = useApp();
@@ -107,7 +106,6 @@ export const AppContent: React.FC = () => {
       {currentView === 'cart' && <CartView />}
       {currentView === 'track-order' && <TrackOrderView />}
       {currentView === 'our-story' && <OurStoryView />}
-      {currentView === 'my-secret' && <CustomerAuthView />}
       {currentView === 'home' && (
         <>
           <HeroCarousel />
@@ -134,11 +132,7 @@ export const AppContent: React.FC = () => {
       {/* Modals */}
       <AddressModal isOpen={isAddressModalOpen} onClose={() => setIsAddressModalOpen(false)} />
       <OffersModal isOpen={isOffersModalOpen} onClose={() => setIsOffersModalOpen(false)} />
-      <AccountModal
-        isOpen={isAccountModalOpen}
-        onClose={() => setIsAccountModalOpen(false)}
-        onOpenAddress={() => setIsAddressModalOpen(true)}
-      />
+      <CustomerAuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       <ProductCustomizationModal
         product={customizingProduct}
         existingCartItem={editingCartItem}

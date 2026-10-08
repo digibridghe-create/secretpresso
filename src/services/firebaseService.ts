@@ -5,7 +5,7 @@ import {
   getDoc,
   addDoc,
   setDoc,
-  updatedoc,
+  updateDoc,
   deleteDoc,
   query,
   orderBy,
@@ -195,11 +195,11 @@ export const firebaseService = {
       ]);
 
       // Get settings
-      let settings = initialSettings;
+      let settings: WebsiteSettings = initialSettings as WebsiteSettings;
       const setDocRef = doc(db, 'settings', 'website');
       const setSnap = await getDoc(setDocRef);
       if (setSnap.exists()) {
-        settings = setSnap.data() as WebsiteSettings;
+        settings = setSnap.data() as unknown as WebsiteSettings;
       } else {
         await setDoc(setDocRef, initialSettings);
       }
@@ -369,7 +369,7 @@ export const firebaseService = {
       displayOrder: data.displayOrder || 1,
       isVisible: data.isVisible ?? true,
       slideDuration: data.slideDuration || 5,
-      textPositions: data.textPositions || {},
+      textPositions: data.textPositions || (initialBanners[0].textPositions as any),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

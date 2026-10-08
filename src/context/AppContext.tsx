@@ -11,6 +11,7 @@ import {
   SelectedCustomizationOption,
 } from '../types';
 import { api } from '../services/api';
+import { auth, db, onAuthStateChanged, doc, getDoc, User } from '../lib/firebase';
 
 export type AppView = 'home' | 'our-brew' | 'my-secret' | 'our-story' | 'track-order' | 'cart' | 'admin';
 
@@ -96,12 +97,15 @@ interface AppContextType {
   setDeliveryAddress: (address: string) => void;
   userProfile: UserProfile | null;
   setUserProfile: (profile: UserProfile | null) => void;
+  currentUser: User | null;
 
   // Modals
   isAddressModalOpen: boolean;
   setIsAddressModalOpen: (open: boolean) => void;
   isAccountModalOpen: boolean;
   setIsAccountModalOpen: (open: boolean) => void;
+  isAuthModalOpen: boolean;
+  setIsAuthModalOpen: (open: boolean) => void;
   isOffersModalOpen: boolean;
   setIsOffersModalOpen: (open: boolean) => void;
 }
@@ -188,15 +192,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
-    // Default guest profile
-    return {
-      name: 'Aarav Sharma',
-      email: 'aarav.sharma@example.com',
-      phone: '+91 98765 43210',
-      avatarUrl: '',
-      role: 'customer',
-    };
+    return null;
   });
+
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        try {
+          const snap = await getDoc(doc(db, 'customers', user.uid));
+          if (snap.exists()) {
+            setUserProfile(snap.data() as UserProfile);
+          } else {
+            setUserProfile({
+              id: user.uid,
+              name: user.displayName || 'Secretpresso Customer',
+              email: user.email || '',
+              phone: user.phoneNumber || '',
+              avatarUrl: user.photoURL || '',
+              role: 'customer',
+            });
+          }
+        } catch (e) {
+          console.warn('Error fetching customer profile (fallback active):', e);
+          setUserProfile({
+            id: user.uid,
+            name: user.displayName || 'Secretpresso Customer',
+            email: user.email || '',
+            phone: user.phoneNumber || '',
+            avatarUrl: user.photoURL || '',
+            role: 'customer',
+          });
+        }
+      } else {
+        setUserProfile(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Modals
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -448,6 +484,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setDeliveryAddress,
         userProfile,
         setUserProfile,
+        currentUser,
         toasts,
         showToast,
         dismissToast,
@@ -455,6 +492,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAddressModalOpen,
         isAccountModalOpen,
         setIsAccountModalOpen,
+        isAuthModalOpen,
+        setIsAuthModalOpen,
         isOffersModalOpen,
         setIsOffersModalOpen,
       }}

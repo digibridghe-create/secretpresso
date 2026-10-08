@@ -1,12 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Search,
-  ChevronDown,
   Coffee,
-  Package,
-  BookOpen,
-  Sparkles,
-  SlidersHorizontal,
   X,
   ShoppingBag,
   User,
@@ -24,15 +19,12 @@ export const Navbar: React.FC = () => {
     addToCart,
     cartCount,
     setIsCartOpen,
-    activeOrder,
+    setIsAuthModalOpen,
     userProfile,
-    setIsAccountModalOpen,
   } = useApp();
 
-  const [isSecretMenuOpen, setIsSecretMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Track scroll position for smooth sticky glass navigation without page jump
@@ -44,12 +36,9 @@ export const Navbar: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close menus on outside click
+  // Close search on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsSecretMenuOpen(false);
-      }
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setIsSearchOpen(false);
       }
@@ -78,7 +67,6 @@ export const Navbar: React.FC = () => {
     view: 'home' | 'our-brew' | 'our-story' | 'track-order' | 'admin',
     anchorId?: string
   ) => {
-    setIsSecretMenuOpen(false);
     if (view === 'our-brew') {
       setCurrentView('home');
       setTimeout(() => {
@@ -116,7 +104,7 @@ export const Navbar: React.FC = () => {
           </div>
         </button>
 
-        {/* CENTER: Navigation Links (BREW HOME, OUR BREW, MY SECRET ⌵) */}
+        {/* CENTER: Navigation Links (BREW HOME, OUR BREW) */}
         <nav className="hidden md:flex items-center gap-7 lg:gap-9 text-[12px] lg:text-[13px] tracking-[0.14em] uppercase font-semibold text-white/90">
           <button
             onClick={() => handleNavClick('home')}
@@ -133,99 +121,9 @@ export const Navbar: React.FC = () => {
           >
             Our Brew
           </button>
-
-          {/* My Secret Dropdown */}
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setIsSecretMenuOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 hover:text-white transition-colors py-1 text-white/80 focus:outline-none"
-            >
-              <span>My Secret</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                  isSecretMenuOpen ? 'rotate-180 text-white' : 'text-white/70'
-                }`}
-              />
-            </button>
-
-            {isSecretMenuOpen && (
-              <div className="absolute top-full left-0 mt-3 w-64 bg-[#18130f]/95 backdrop-blur-md border border-[#3e3126]/60 rounded-xl shadow-2xl py-2 z-50 text-xs text-[#e8ded3] animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="px-4 py-2 border-b border-[#2d231b] mb-1">
-                  <p className="text-[11px] uppercase tracking-wider text-[#9d8975] font-semibold">
-                    Secret Member Lounge
-                  </p>
-                  <p className="text-[12px] text-[#f5f0eb] font-medium mt-0.5">
-                    {activeOrder ? 'Welcome Back!' : 'Collector & Coffee Connoisseur'}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setIsSecretMenuOpen(false);
-                    setCurrentView('my-secret');
-                  }}
-                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-[#251e18] hover:text-[#e4be88] transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <User className="w-4 h-4 text-[#c59c6b]" />
-                    <span>{userProfile ? `Account (${userProfile.name})` : 'Sign In / Register'}</span>
-                  </div>
-                  {userProfile && (
-                    <span className="text-[10px] text-[#e0b985] font-medium bg-[#3a2c20] px-1.5 py-0.5 rounded">
-                      {userProfile.role}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => handleNavClick('track-order')}
-                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-[#251e18] hover:text-[#e4be88] transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Package className="w-4 h-4 text-[#c59c6b]" />
-                    <span>Track Active Order</span>
-                  </div>
-                  {activeOrder && (
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  )}
-                </button>
-
-                <button
-                  onClick={() => handleNavClick('track-order')}
-                  className="w-full px-4 py-2.5 flex items-center gap-2.5 hover:bg-[#251e18] hover:text-[#e4be88] transition-colors text-left"
-                >
-                  <Sparkles className="w-4 h-4 text-[#c59c6b]" />
-                  <span>My Collectible Toy Vault</span>
-                </button>
-
-                <button
-                  onClick={() => handleNavClick('our-story')}
-                  className="w-full px-4 py-2.5 flex items-center gap-2.5 hover:bg-[#251e18] hover:text-[#e4be88] transition-colors text-left"
-                >
-                  <BookOpen className="w-4 h-4 text-[#c59c6b]" />
-                  <span>Our Story & Philosophy</span>
-                </button>
-
-                <div className="border-t border-[#2d231b] my-1" />
-
-                <button
-                  onClick={() => handleNavClick('admin')}
-                  className="w-full px-4 py-2.5 flex items-center justify-between text-[#c89b63] hover:bg-[#251e18] transition-colors text-left font-medium"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <SlidersHorizontal className="w-4 h-4" />
-                    <span>CMS Admin Panel</span>
-                  </div>
-                  <span className="text-[10px] bg-[#3a2c20] text-[#e0b985] px-1.5 py-0.5 rounded">
-                    Manage
-                  </span>
-                </button>
-              </div>
-            )}
-          </div>
         </nav>
 
-        {/* RIGHT: Search brews... input + Bag Icon + Admin button matching reference */}
+        {/* RIGHT: Search brews... input + Bag Icon + Account + Admin button matching reference */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Pill Search Input */}
           <div className="relative" ref={searchRef}>
@@ -322,9 +220,9 @@ export const Navbar: React.FC = () => {
             )}
           </button>
 
-          {/* User Account / Profile Button */}
+          {/* User Account / Sign In Button */}
           <button
-            onClick={() => setIsAccountModalOpen(true)}
+            onClick={() => setIsAuthModalOpen(true)}
             title={userProfile ? `Account: ${userProfile.name}` : 'Sign In / Register'}
             className="w-8.5 h-8.5 sm:w-9.5 sm:h-9.5 rounded-xl border border-white/30 hover:border-white bg-white/5 backdrop-blur-sm flex items-center justify-center text-white transition-colors relative focus:outline-none shrink-0"
           >

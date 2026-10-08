@@ -23,8 +23,7 @@ export const BottomNav: React.FC = () => {
     categories,
     settings,
     addToCart,
-    isAccountModalOpen,
-    setIsAccountModalOpen,
+    setIsAuthModalOpen,
     showToast,
   } = useApp();
 
@@ -160,7 +159,7 @@ export const BottomNav: React.FC = () => {
     }
   };
 
-  const handleNav = (target: 'home' | 'menu' | 'account') => {
+  const handleNav = (target: 'home' | 'menu') => {
     setShowResults(false);
     if (target === 'home') {
       setCurrentView('home');
@@ -171,13 +170,10 @@ export const BottomNav: React.FC = () => {
         const el = document.getElementById('coffee-flavours');
         if (el) el.scrollIntoView({ behavior: 'smooth' });
       }, 50);
-    } else if (target === 'account') {
-      setCurrentView('my-secret');
     }
   };
 
   const isHomeActive = currentView === 'home' && !showResults;
-  const isAccountActive = currentView === 'my-secret';
   const currencySymbol = settings?.currencySymbol || '₹';
 
   const quickChips = [
@@ -481,17 +477,15 @@ export const BottomNav: React.FC = () => {
         {/* 4. ACCOUNT */}
         <button
           type="button"
-          onClick={() => handleNav('account')}
-          className={`shrink-0 flex flex-col items-center justify-center py-0.5 px-2 rounded-full transition-all min-w-[42px] ${
-            isAccountActive
-              ? 'text-[#140F0B] font-semibold'
-              : 'text-[#7A6E64] hover:text-[#140F0B]'
-          }`}
+          onClick={() => setIsAuthModalOpen(true)}
+          className="shrink-0 flex flex-col items-center justify-center py-0.5 px-2 rounded-full text-[#7A6E64] hover:text-[#140F0B] transition-all min-w-[42px]"
           aria-label="Account"
         >
-          <User className={`w-4.5 h-4.5 ${isAccountActive ? 'stroke-[2.2] text-[#140F0B]' : 'stroke-[1.8]'}`} />
+          <User className="w-4.5 h-4.5 stroke-[1.8]" />
           <span className="text-[9px] tracking-tight leading-tight mt-0.5">Account</span>
         </button>
+
+
       </nav>
     </>
   );
