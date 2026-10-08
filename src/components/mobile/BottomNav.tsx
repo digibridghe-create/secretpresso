@@ -172,12 +172,12 @@ export const BottomNav: React.FC = () => {
         if (el) el.scrollIntoView({ behavior: 'smooth' });
       }, 50);
     } else if (target === 'account') {
-      setIsAccountModalOpen(true);
+      setCurrentView('my-secret');
     }
   };
 
-  const isHomeActive = currentView === 'home' && !isAccountModalOpen && !showResults;
-  const isAccountActive = isAccountModalOpen;
+  const isHomeActive = currentView === 'home' && !showResults;
+  const isAccountActive = currentView === 'my-secret';
   const currencySymbol = settings?.currencySymbol || '₹';
 
   const quickChips = [

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, MapPin, Check, Plus, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { supabase } from '../../lib/supabase';
 
 interface AddressModalProps {
   isOpen: boolean;
@@ -16,7 +15,7 @@ interface AddressItem {
 }
 
 export const AddressModal: React.FC<AddressModalProps> = ({ isOpen, onClose }) => {
-  const { showToast, setDeliveryAddress, userProfile } = useApp();
+  const { showToast, setDeliveryAddress } = useApp();
   const [addresses, setAddresses] = useState<AddressItem[]>([
     { id: '1', title: 'Home', address: '135/10 Vivekanand College, Bengaluru', isDefault: true },
     { id: '2', title: 'Work', address: '7th Floor, Prestige Tech Park, Bengaluru', isDefault: false },
@@ -26,30 +25,6 @@ export const AddressModal: React.FC<AddressModalProps> = ({ isOpen, onClose }) =
   const [newTitle, setNewTitle] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-
-  // Load addresses from Supabase if authenticated
-  useEffect(() => {
-    if (!isOpen || !userProfile?.id) return;
-
-    supabase
-      .from('addresses')
-      .select('*')
-      .eq('user_id', userProfile.id)
-      .order('is_default', { ascending: false })
-      .then(({ data, error }) => {
-        if (!error && data && data.length > 0) {
-          const loaded: AddressItem[] = data.map((a) => ({
-            id: a.id,
-            title: a.label,
-            address: a.full_address,
-            isDefault: a.is_default,
-          }));
-          setAddresses(loaded);
-          const def = loaded.find((a) => a.isDefault) || loaded[0];
-          setSelectedId(def.id);
-        }
-      });
-  }, [isOpen, userProfile?.id]);
 
   if (!isOpen) return null;
 
@@ -75,28 +50,6 @@ export const AddressModal: React.FC<AddressModalProps> = ({ isOpen, onClose }) =
       isDefault: addresses.length === 0,
     };
 
-    // Save to Supabase if authenticated
-    if (userProfile?.id) {
-      try {
-        const { data, error } = await supabase
-          .from('addresses')
-          .insert({
-            user_id: userProfile.id,
-            label: newEntry.title,
-            full_address: newEntry.address,
-            is_default: newEntry.isDefault,
-          })
-          .select()
-          .single();
-
-        if (!error && data) {
-          newEntry.id = data.id;
-        }
-      } catch (err) {
-        console.warn('Could not save address to Supabase:', err);
-      }
-    }
-
     setAddresses((prev) => [...prev, newEntry]);
     setSelectedId(newEntry.id);
     setDeliveryAddress(`${newEntry.title} • ${newEntry.address}`);
@@ -108,13 +61,6 @@ export const AddressModal: React.FC<AddressModalProps> = ({ isOpen, onClose }) =
   };
 
   const handleDelete = async (id: string) => {
-    if (userProfile?.id) {
-      try {
-        await supabase.from('addresses').delete().eq('id', id);
-      } catch (err) {
-        console.warn('Could not delete address from Supabase:', err);
-      }
-    }
     setAddresses((prev) => prev.filter((a) => a.id !== id));
     showToast('Address removed', 'info');
   };
@@ -140,100 +86,103 @@ export const AddressModal: React.FC<AddressModalProps> = ({ isOpen, onClose }) =
         {isAdding ? (
           <form onSubmit={handleAddAddress} className="space-y-4">
             <div>
-              <label className="text-xs font-semibold text-[#7A6E64]">Address Label (e.g. Home, Office)</label>
+              <label className="block text-xs font-semibold text-[#5A4E44] mb-1">Address Label (e.g., Home, Office)</label>
               <input
                 type="text"
+                placeholder="Home, Office, etc."
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="Home"
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[#D5CCC0] text-xs text-[#140F0B] focus:outline-none focus:border-[#140F0B]"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#EFE7DA] text-sm focus:outline-none focus:border-[#C89B63]"
+                autoFocus
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-[#7A6E64]">Full Street Address</label>
+              <label className="block text-xs font-semibold text-[#5A4E44] mb-1">Full Delivery Address</label>
               <textarea
+                placeholder="Street, area, landmark, pincode..."
                 value={newAddress}
                 onChange={(e) => setNewAddress(e.target.value)}
-                placeholder="Flat 204, Secret Roastery Street, Indiranagar, Bengaluru"
                 rows={3}
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[#D5CCC0] text-xs text-[#140F0B] focus:outline-none focus:border-[#140F0B] resize-none"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#EFE7DA] text-sm focus:outline-none focus:border-[#C89B63] resize-none"
               />
             </div>
-            <div className="flex gap-2 pt-2">
+            <div className="flex items-center gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setIsAdding(false)}
-                className="flex-1 py-2.5 rounded-xl border border-[#D5CCC0] text-xs font-semibold text-[#7A6E64] hover:bg-[#FAF5EE] cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl border border-[#EFE7DA] text-xs font-semibold text-[#5A4E44] hover:bg-[#FAF5EE] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="flex-1 py-2.5 rounded-xl bg-[#140F0B] text-white text-xs font-semibold hover:bg-[#251B14] cursor-pointer shadow-md disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-[#2C1D11] text-[#FDF9F4] text-xs font-semibold hover:bg-[#3D2819] cursor-pointer disabled:opacity-50"
               >
-                {isSaving ? 'Saving...' : 'Save to Supabase'}
+                {isSaving ? 'Saving...' : 'Save Address'}
               </button>
             </div>
           </form>
         ) : (
-          <div className="space-y-4">
-            <div className="space-y-2.5">
-              {addresses.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => handleSelect(item)}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
-                    selectedId === item.id
-                      ? 'border-[#C89B63] bg-[#FAF5EE]'
-                      : 'border-[#E5DBCC] bg-white hover:border-[#C89B63]/60'
-                  }`}
-                >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div
-                      className={`w-5 h-5 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${
-                        selectedId === item.id
-                          ? 'border-[#C89B63] bg-[#C89B63] text-white'
-                          : 'border-[#D5CCC0]'
-                      }`}
-                    >
-                      {selectedId === item.id && <Check className="w-3 h-3 stroke-[3]" />}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#140F0B]">{item.title}</span>
-                        {item.isDefault && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#140F0B] text-white">
-                            Default
-                          </span>
-                        )}
+          <div className="space-y-3">
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+              {addresses.map((item) => {
+                const isSelected = selectedId === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelect(item)}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
+                      isSelected
+                        ? 'border-[#C89B63] bg-[#FAF5EE]/80 shadow-xs'
+                        : 'border-[#EFE7DA] hover:border-[#D8C7B5] bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                        isSelected ? 'bg-[#C89B63] text-white' : 'bg-[#FAF5EE] text-[#7A6E64]'
+                      }`}>
+                        <MapPin className="w-4 h-4" />
                       </div>
-                      <p className="text-[11px] text-[#7A6E64] mt-0.5 leading-snug line-clamp-2">
-                        {item.address}
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-serif font-bold text-sm text-[#140F0B]">{item.title}</span>
+                          {item.isDefault && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#C89B63]/15 text-[#8C5E28] font-semibold">
+                              Default
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-[#7A6E64] mt-1 leading-relaxed">{item.address}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isSelected && <Check className="w-4 h-4 text-[#C89B63] shrink-0 mt-1" />}
+                      {addresses.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(item.id);
+                          }}
+                          className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                          title="Delete address"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
-                  {addresses.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(item.id);
-                      }}
-                      className="text-[#A89C8F] hover:text-rose-600 p-1 cursor-pointer shrink-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <button
               onClick={() => setIsAdding(true)}
-              className="w-full py-3 rounded-full border border-dashed border-[#C89B63] bg-[#FAF5EE]/50 hover:bg-[#FAF5EE] text-[#140F0B] text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="w-full py-3 rounded-2xl border border-dashed border-[#C89B63]/60 text-[#C89B63] hover:bg-[#FAF5EE] text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4 text-[#C89B63]" />
+              <Plus className="w-4 h-4" />
               <span>Add New Delivery Address</span>
             </button>
           </div>

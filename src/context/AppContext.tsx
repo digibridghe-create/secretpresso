@@ -11,7 +11,6 @@ import {
   SelectedCustomizationOption,
 } from '../types';
 import { api } from '../services/api';
-import { supabase, subscribeToSupabaseOrder } from '../lib/supabase';
 
 export type AppView = 'home' | 'our-brew' | 'my-secret' | 'our-story' | 'track-order' | 'cart' | 'admin';
 
@@ -242,101 +241,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     refreshData();
   }, [refreshData]);
-
-  // -------------------------------------------------------------
-  // SUPABASE AUTH INITIALIZATION & SESSION RESTORATION
-  // -------------------------------------------------------------
-  useEffect(() => {
-    // Restore existing Supabase session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const u = session.user;
-        setUserProfile({
-          id: u.id,
-          name: u.user_metadata?.full_name || u.email?.split('@')[0] || 'Customer',
-          email: u.email || '',
-          phone: u.user_metadata?.phone || '',
-          avatarUrl: u.user_metadata?.avatar_url || '',
-          role: (u.user_metadata?.role as any) || 'customer',
-        });
-
-        // Try reading role & details from public.profiles table if present
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', u.id)
-          .maybeSingle()
-          .then(({ data: p }) => {
-            if (p) {
-              setUserProfile((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      name: p.full_name || prev.name,
-                      phone: p.phone || prev.phone,
-                      avatarUrl: p.avatar_url || prev.avatarUrl,
-                      role: p.role,
-                    }
-                  : null
-              );
-            }
-          });
-      }
-    });
-
-    // Listen to real-time auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const u = session.user;
-        let role: 'customer' | 'admin' = (u.user_metadata?.role as any) || 'customer';
-
-        const { data: p } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', u.id)
-          .maybeSingle();
-
-        if (p?.role) {
-          role = p.role;
-        }
-
-        setUserProfile({
-          id: u.id,
-          name: p?.full_name || u.user_metadata?.full_name || u.email?.split('@')[0] || 'Customer',
-          email: u.email || '',
-          phone: p?.phone || u.user_metadata?.phone || '',
-          avatarUrl: p?.avatar_url || u.user_metadata?.avatar_url || '',
-          role,
-        });
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // -------------------------------------------------------------
-  // SUPABASE REALTIME ORDER UPDATES
-  // -------------------------------------------------------------
-  useEffect(() => {
-    const targetOrderId = trackingOrderId || activeOrder?.id;
-    if (!targetOrderId) return;
-
-    const unsubscribe = subscribeToSupabaseOrder(targetOrderId, (newStatus, updatedData) => {
-      showToast(`Order #${targetOrderId} is now ${newStatus.replace(/_/g, ' ')}`, 'info');
-      setActiveOrder((prev) => (prev ? { ...prev, status: newStatus as any } : null));
-      setOrders((prev) =>
-        prev.map((o) => (o.id === targetOrderId ? { ...o, status: newStatus as any } : o))
-      );
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [trackingOrderId, activeOrder?.id, showToast]);
 
   // Open Customization Modal
   const openCustomizationModal = useCallback(

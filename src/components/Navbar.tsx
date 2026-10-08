@@ -162,7 +162,7 @@ export const Navbar: React.FC = () => {
                 <button
                   onClick={() => {
                     setIsSecretMenuOpen(false);
-                    setIsAccountModalOpen(true);
+                    setCurrentView('my-secret');
                   }}
                   className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-[#251e18] hover:text-[#e4be88] transition-colors text-left"
                 >

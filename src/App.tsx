@@ -13,6 +13,7 @@ import { TrackOrderView } from './components/TrackOrderView';
 import { OurStoryView } from './components/OurStoryView';
 import { CartView } from './components/CartView';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { CustomerAuthView } from './components/CustomerAuthView';
 import { ProductCustomizationModal } from './components/ProductCustomizationModal';
 import { BottomNav } from './components/mobile/BottomNav';
 import { MobileTopAddressBar } from './components/mobile/MobileTopAddressBar';
@@ -106,6 +107,7 @@ export const AppContent: React.FC = () => {
       {currentView === 'cart' && <CartView />}
       {currentView === 'track-order' && <TrackOrderView />}
       {currentView === 'our-story' && <OurStoryView />}
+      {currentView === 'my-secret' && <CustomerAuthView />}
       {currentView === 'home' && (
         <>
           <HeroCarousel />

@@ -1,4 +1,3 @@
-import { supabaseService } from './supabaseService';
 import {
   Section,
   Product,
@@ -11,119 +10,247 @@ import {
 } from '../types';
 
 export const api = {
-  // Bootstrap all data in a single clean call
-  getBootstrap(): Promise<BootstrapResponse> {
-    return supabaseService.getBootstrap();
+  async getBootstrap(): Promise<BootstrapResponse> {
+    const res = await fetch('/api/bootstrap');
+    const json = await res.json();
+    if (!json.success) throw new Error('Failed to load store data');
+    return json.data;
   },
 
-  // Sections
-  getSections(): Promise<Section[]> {
-    return supabaseService.getSections();
+  async getSections(): Promise<Section[]> {
+    const res = await fetch('/api/sections');
+    const json = await res.json();
+    return json.success ? json.data : [];
   },
 
-  createSection(data: Partial<Section>): Promise<Section> {
-    return supabaseService.createSection(data);
+  async createSection(data: Partial<Section>): Promise<Section> {
+    const res = await fetch('/api/sections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to create section');
+    return json.data;
   },
 
-  updateSection(id: string, data: Partial<Section>): Promise<Section> {
-    return supabaseService.updateSection(id, data);
+  async updateSection(id: string, data: Partial<Section>): Promise<Section> {
+    const res = await fetch(`/api/sections/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to update section');
+    return json.data;
   },
 
-  reorderSections(orderedIds: string[]): Promise<Section[]> {
-    return supabaseService.reorderSections(orderedIds);
+  async reorderSections(orderedIds: string[]): Promise<Section[]> {
+    const res = await fetch('/api/sections/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderedIds }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to reorder sections');
+    return json.data;
   },
 
-  deleteSection(id: string): Promise<void> {
-    return supabaseService.deleteSection(id);
+  async deleteSection(id: string): Promise<void> {
+    const res = await fetch(`/api/sections/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to delete section');
   },
 
-  // Products
-  getProducts(): Promise<Product[]> {
-    return supabaseService.getProducts();
+  async getProducts(): Promise<Product[]> {
+    const res = await fetch('/api/products');
+    const json = await res.json();
+    return json.success ? json.data : [];
   },
 
-  createProduct(data: Partial<Product>): Promise<Product> {
-    return supabaseService.createProduct(data);
+  async createProduct(data: Partial<Product>): Promise<Product> {
+    const res = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to create product');
+    return json.data;
   },
 
-  updateProduct(id: string, data: Partial<Product>): Promise<Product> {
-    return supabaseService.updateProduct(id, data);
+  async updateProduct(id: string, data: Partial<Product>): Promise<Product> {
+    const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to update product');
+    return json.data;
   },
 
-  deleteProduct(id: string): Promise<void> {
-    return supabaseService.deleteProduct(id);
+  async deleteProduct(id: string): Promise<void> {
+    const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to delete product');
   },
 
-  // Categories
-  getCategories(): Promise<Category[]> {
-    return supabaseService.getCategories();
+  async getCategories(): Promise<Category[]> {
+    const res = await fetch('/api/categories');
+    const json = await res.json();
+    return json.success ? json.data : [];
   },
 
-  createCategory(data: Partial<Category>): Promise<Category> {
-    return supabaseService.createCategory(data);
+  async createCategory(data: Partial<Category>): Promise<Category> {
+    const res = await fetch('/api/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to create category');
+    return json.data;
   },
 
-  updateCategory(id: string, data: Partial<Category>): Promise<Category> {
-    return supabaseService.updateCategory(id, data);
+  async updateCategory(id: string, data: Partial<Category>): Promise<Category> {
+    const res = await fetch(`/api/categories/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to update category');
+    return json.data;
   },
 
-  deleteCategory(id: string): Promise<void> {
-    return supabaseService.deleteCategory(id);
+  async deleteCategory(id: string): Promise<void> {
+    const res = await fetch(`/api/categories/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to delete category');
   },
 
-  // Banners
-  getBanners(): Promise<Banner[]> {
-    return supabaseService.getBanners();
+  async getBanners(): Promise<Banner[]> {
+    const res = await fetch('/api/banners');
+    const json = await res.json();
+    return json.success ? json.data : [];
   },
 
-  createBanner(data: Partial<Banner>): Promise<Banner> {
-    return supabaseService.createBanner(data);
+  async createBanner(data: Partial<Banner>): Promise<Banner> {
+    const res = await fetch('/api/banners', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to create banner');
+    return json.data;
   },
 
-  updateBanner(id: string, data: Partial<Banner>): Promise<Banner> {
-    return supabaseService.updateBanner(id, data);
+  async updateBanner(id: string, data: Partial<Banner>): Promise<Banner> {
+    const res = await fetch(`/api/banners/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to update banner');
+    return json.data;
   },
 
-  deleteBanner(id: string): Promise<void> {
-    return supabaseService.deleteBanner(id);
+  async deleteBanner(id: string): Promise<void> {
+    const res = await fetch(`/api/banners/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to delete banner');
   },
 
-  // Media Library
-  getMedia(): Promise<MediaItem[]> {
-    return supabaseService.getMedia();
+  async getMedia(): Promise<MediaItem[]> {
+    const res = await fetch('/api/media');
+    const json = await res.json();
+    return json.success ? json.data : [];
   },
 
-  uploadMedia(file: File, name?: string, category: string = 'other'): Promise<MediaItem> {
-    return supabaseService.uploadMedia(file, name, category);
+  async uploadMedia(file: File, name?: string, category: string = 'other'): Promise<MediaItem> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (name) formData.append('name', name);
+    formData.append('category', category);
+
+    const res = await fetch('/api/media/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to upload media');
+    return json.data;
   },
 
-  deleteMedia(id: string): Promise<void> {
-    return supabaseService.deleteMedia(id);
+  async deleteMedia(id: string): Promise<void> {
+    const res = await fetch(`/api/media/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to delete media');
   },
 
-  // Orders
-  getOrders(): Promise<Order[]> {
-    return supabaseService.getOrders();
+  async getOrders(): Promise<Order[]> {
+    const res = await fetch('/api/orders');
+    const json = await res.json();
+    return json.success ? json.data : [];
   },
 
-  getOrder(id: string): Promise<Order> {
-    return supabaseService.getOrder(id);
+  async getOrder(id: string): Promise<Order> {
+    const res = await fetch(`/api/orders/${encodeURIComponent(id)}`);
+    const json = await res.json();
+    if (!json.success) throw new Error('Order not found');
+    return json.data;
   },
 
-  createOrder(orderData: Partial<Order>): Promise<Order> {
-    return supabaseService.createOrder(orderData);
+  async createOrder(orderData: Partial<Order>): Promise<Order> {
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to place order');
+    return json.data;
   },
 
-  updateOrderStatus(id: string, status: string): Promise<Order> {
-    return supabaseService.updateOrderStatus(id, status);
+  async updateOrderStatus(id: string, status: string): Promise<Order> {
+    const res = await fetch(`/api/orders/${encodeURIComponent(id)}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to update order status');
+    return json.data;
   },
 
-  // Settings
-  getSettings(): Promise<WebsiteSettings> {
-    return supabaseService.getSettings();
+  async getSettings(): Promise<WebsiteSettings> {
+    const res = await fetch('/api/settings');
+    const json = await res.json();
+    if (!json.success) throw new Error('Failed to load settings');
+    return json.data;
   },
 
-  updateSettings(settings: Partial<WebsiteSettings>): Promise<WebsiteSettings> {
-    return supabaseService.updateSettings(settings);
+  async updateSettings(settings: Partial<WebsiteSettings>): Promise<WebsiteSettings> {
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to update settings');
+    return json.data;
   },
 };
