@@ -280,7 +280,7 @@ export const BannerManager: React.FC = () => {
                     required
                     value={image}
                     onChange={(e) => setImage(e.target.value)}
-                    placeholder="/uploads/..."
+                    placeholder="https://res.cloudinary.com/..."
                     className="w-full px-3 py-2 rounded-lg bg-[#1c140f] border border-[#3b2b1d] focus:border-[#c89b63] text-[#f5f0eb] focus:outline-none"
                   />
                   <button
@@ -292,6 +292,22 @@ export const BannerManager: React.FC = () => {
                     <span>Browse Media</span>
                   </button>
                 </div>
+                {image && (
+                  <div className="mt-2 p-2 rounded-lg bg-[#0c0806] border border-[#312217] flex items-center gap-3">
+                    <img
+                      src={image}
+                      alt="Preview"
+                      className="w-12 h-12 object-contain rounded bg-black/40 p-0.5 shrink-0 border border-[#3b2b1d]"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="%238e7c6d" stroke-width="1.5"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                      }}
+                    />
+                    <div className="text-[11px] text-[#a49180] truncate flex-1">
+                      <span className="text-[#dfb780] font-medium block">Cloudinary Image URL Preview</span>
+                      <span className="truncate block opacity-80">{image}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

@@ -14,7 +14,7 @@ export const DynamicSection: React.FC<DynamicSectionProps> = ({ section, product
       id={section.id}
       className="w-full bg-[#FAF7F2] text-[#140F0B] py-10 sm:py-12 md:py-14 px-4 sm:px-8 border-b border-[#EFE7DA]"
     >
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[1260px] mx-auto">
         {/* Section Header with warm editorial typography matching reference */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-8">
           <div>

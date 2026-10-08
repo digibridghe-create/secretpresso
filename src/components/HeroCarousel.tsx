@@ -127,7 +127,7 @@ export const HeroCarousel: React.FC = () => {
       aria-roledescription="carousel"
       aria-label="Hero Carousel"
       tabIndex={0}
-      className="relative w-full min-h-[380px] sm:min-h-[430px] md:min-h-[470px] lg:min-h-[500px] max-h-[560px] bg-[#0e0a08] overflow-hidden flex flex-col justify-between select-none focus:outline-none touch-pan-y cursor-grab active:cursor-grabbing"
+      className="relative w-full min-h-[380px] sm:min-h-[420px] md:h-[350px] lg:h-[380px] max-h-[420px] bg-[#0e0a08] overflow-hidden flex flex-col justify-between select-none focus:outline-none touch-pan-y cursor-grab active:cursor-grabbing mt-16 md:mt-18"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
@@ -135,38 +135,39 @@ export const HeroCarousel: React.FC = () => {
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchCancel}
     >
-      {/* Banner Image Background */}
-      <div className="absolute inset-0 z-0">
+      {/* Banner Image Background — object-contain to never crop banner composition */}
+      <div className="absolute inset-0 z-0 flex items-center justify-center bg-[#120d09]">
         <img
           src={bannerImg}
           alt={headingText}
-          className="w-full h-full object-cover object-center animate-fade-in"
+          className="w-full h-full object-contain object-center animate-fade-in"
+          referrerPolicy="no-referrer"
         />
         {/* Subtle bottom gradient for readability of hero content */}
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#0d0a08]/90 via-[#0d0a08]/40 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#0d0a08]/90 via-[#0d0a08]/40 to-transparent pointer-events-none" />
       </div>
 
       {/* Hero Content */}
-      <div className="relative z-25 flex-1 flex flex-col justify-end px-4 sm:px-8 pb-10 sm:pb-12 pt-16 md:pt-24">
-        <div className="max-w-3xl space-y-3">
+      <div className="relative z-25 flex-1 flex flex-col justify-end px-4 sm:px-8 pb-8 sm:pb-10 pt-12 md:pt-16 max-w-[1260px] mx-auto w-full">
+        <div className="max-w-2xl space-y-2.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1c140f]/75 border border-[#c89b63]/40 text-[#dfb780] text-[10px] sm:text-xs font-medium tracking-widest uppercase">
             <Sparkles className="w-3.5 h-3.5 text-[#c89b63]" />
             <span>{eyebrowText}</span>
           </div>
 
-          <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl text-[#fbf7f2] font-normal leading-[1.1] whitespace-pre-line drop-shadow-md">
+          <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl text-[#fbf7f2] font-normal leading-[1.1] whitespace-pre-line drop-shadow-md">
             {headingText}
           </h1>
 
-          <p className="text-xs sm:text-sm text-[#d6ccc2] max-w-lg leading-relaxed drop-shadow">
+          <p className="text-xs sm:text-sm text-[#d6ccc2] max-w-md leading-relaxed drop-shadow line-clamp-2">
             {descriptionText}
           </p>
 
-          <div className="pt-2 flex items-center gap-3">
+          <div className="pt-1 flex items-center gap-3">
             <a
               href={ctaButtonLink}
               onClick={(e) => handleCtaClick(e, ctaButtonLink)}
-              className="px-6 py-3 rounded-full bg-[#c89b63] text-[#100c08] text-xs sm:text-sm font-bold tracking-wider uppercase hover:bg-[#dfb780] transition-colors shadow-lg active:scale-95"
+              className="px-5 py-2.5 rounded-full bg-[#c89b63] text-[#100c08] text-xs sm:text-sm font-bold tracking-wider uppercase hover:bg-[#dfb780] transition-colors shadow-lg active:scale-95"
             >
               {ctaButtonText}
             </a>
@@ -176,7 +177,7 @@ export const HeroCarousel: React.FC = () => {
 
       {/* Slide Indicators / Navigation */}
       {heroBanners.length > 1 && (
-        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
+        <div className="absolute bottom-3 right-4 z-20 flex items-center gap-2">
           {heroBanners.map((_, idx) => (
             <button
               key={idx}

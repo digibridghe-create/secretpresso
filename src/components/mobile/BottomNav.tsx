@@ -3,7 +3,6 @@ import {
   Search,
   Home,
   Coffee,
-  User,
   Mic,
   MicOff,
   X,
@@ -23,7 +22,6 @@ export const BottomNav: React.FC = () => {
     categories,
     settings,
     addToCart,
-    setIsAuthModalOpen,
     showToast,
   } = useApp();
 
@@ -472,17 +470,6 @@ export const BottomNav: React.FC = () => {
         >
           <Coffee className="w-4.5 h-4.5 stroke-[1.8]" />
           <span className="text-[9px] tracking-tight leading-tight mt-0.5">Menu</span>
-        </button>
-
-        {/* 4. ACCOUNT */}
-        <button
-          type="button"
-          onClick={() => setIsAuthModalOpen(true)}
-          className="shrink-0 flex flex-col items-center justify-center py-0.5 px-2 rounded-full text-[#7A6E64] hover:text-[#140F0B] transition-all min-w-[42px]"
-          aria-label="Account"
-        >
-          <User className="w-4.5 h-4.5 stroke-[1.8]" />
-          <span className="text-[9px] tracking-tight leading-tight mt-0.5">Account</span>
         </button>
 
 

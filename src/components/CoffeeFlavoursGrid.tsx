@@ -26,7 +26,7 @@ export const CoffeeFlavoursGrid: React.FC = () => {
       id="coffee-flavours"
       className="w-full bg-[#FAF7F2] text-[#140F0B] py-10 sm:py-12 md:py-14 px-4 sm:px-8 border-b border-[#EFE7DA]"
     >
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[1260px] mx-auto">
         {/* Header matching reference screenshot: Title on left, subtitle & View All on right */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div>
