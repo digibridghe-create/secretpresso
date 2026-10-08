@@ -1,11 +1,40 @@
 import dotenv from 'dotenv';
 dotenv.config();
+
+// Suppress benign Firestore gRPC idle stream warnings
+const originalWarn = console.warn;
+console.warn = (...args: any[]) => {
+  if (typeof args[0] === 'string' && (args[0].includes('GrpcConnection') || args[0].includes('Disconnecting idle stream'))) {
+    return;
+  }
+  originalWarn(...args);
+};
+const originalError = console.error;
+console.error = (...args: any[]) => {
+  if (typeof args[0] === 'string' && (args[0].includes('GrpcConnection') || args[0].includes('Disconnecting idle stream'))) {
+    return;
+  }
+  originalError(...args);
+};
+
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import crypto from 'crypto';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, doc, getDocs, setDoc, getDoc } from 'firebase/firestore';
+import firebaseConfig from './firebase-applet-config.json';
+
+let firestoreDb: any = null;
+try {
+  const firebaseApp = initializeApp(firebaseConfig);
+  firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
+  console.log('[SECRETpresso] Connected to Firebase Firestore:', firebaseConfig.firestoreDatabaseId);
+} catch (e) {
+  console.warn('[SECRETpresso] Firebase Firestore init warning (running on local JSON fallback):', e);
+}
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -60,6 +89,8 @@ interface DatabaseSchema {
   media: any[];
   orders: any[];
   settings: any;
+  backups?: any[];
+  auditLogs?: any[];
 }
 
 function readDatabase(): DatabaseSchema {
@@ -74,11 +105,84 @@ function readDatabase(): DatabaseSchema {
   return getInitialDatabase();
 }
 
+async function syncFromCloudToLocal() {
+  if (!firestoreDb) return;
+  try {
+    const collectionsList = ['categories', 'sections', 'products', 'banners', 'media', 'orders'];
+    const currentDb = readDatabase();
+    let hasChanges = false;
+
+    for (const colName of collectionsList) {
+      const snap = await getDocs(collection(firestoreDb, colName));
+      if (!snap.empty) {
+        const cloudDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (cloudDocs.length > 0) {
+          (currentDb as any)[colName] = cloudDocs;
+          hasChanges = true;
+        }
+      }
+    }
+
+    const setSnap = await getDoc(doc(firestoreDb, 'settings', 'website'));
+    if (setSnap.exists()) {
+      currentDb.settings = setSnap.data() as any;
+      hasChanges = true;
+    }
+
+    if (hasChanges) {
+      const tempFile = `${DB_FILE}.tmp.${crypto.randomBytes(4).toString('hex')}`;
+      fs.writeFileSync(tempFile, JSON.stringify(currentDb, null, 2), 'utf-8');
+      fs.renameSync(tempFile, DB_FILE);
+      console.log('[SECRETpresso] Synced production data from Firebase Firestore cloud successfully.');
+    }
+  } catch (err) {
+    console.warn('[SECRETpresso] Cloud sync notice:', err);
+  }
+}
+
 function writeDatabase(data: DatabaseSchema): boolean {
   try {
     const tempFile = `${DB_FILE}.tmp.${crypto.randomBytes(4).toString('hex')}`;
     fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
     fs.renameSync(tempFile, DB_FILE);
+
+    // Mirror to Firestore for cross-device & cross-account persistence
+    if (firestoreDb) {
+      (async () => {
+        try {
+          for (const cat of data.categories) {
+            const { id, ...rest } = cat;
+            await setDoc(doc(firestoreDb, 'categories', id), rest, { merge: true });
+          }
+          for (const sec of data.sections) {
+            const { id, ...rest } = sec;
+            await setDoc(doc(firestoreDb, 'sections', id), rest, { merge: true });
+          }
+          for (const prod of data.products) {
+            const { id, ...rest } = prod;
+            await setDoc(doc(firestoreDb, 'products', id), rest, { merge: true });
+          }
+          for (const ban of data.banners) {
+            const { id, ...rest } = ban;
+            await setDoc(doc(firestoreDb, 'banners', id), rest, { merge: true });
+          }
+          for (const med of data.media) {
+            const { id, ...rest } = med;
+            await setDoc(doc(firestoreDb, 'media', id), rest, { merge: true });
+          }
+          for (const ord of data.orders) {
+            const { id, ...rest } = ord;
+            await setDoc(doc(firestoreDb, 'orders', id), rest, { merge: true });
+          }
+          if (data.settings) {
+            await setDoc(doc(firestoreDb, 'settings', 'website'), data.settings, { merge: true });
+          }
+        } catch (cloudErr) {
+          console.warn('[SECRETpresso] Cloud write mirror notice:', cloudErr);
+        }
+      })();
+    }
+
     return true;
   } catch (err) {
     console.error('Error writing database:', err);
@@ -1147,23 +1251,16 @@ app.delete('/api/media/:id', (req, res) => {
     return res.status(404).json({ success: false, error: 'Media not found' });
   }
 
-  const mediaItem = db.media[index];
-  // Attempt to delete physical file if inside UPLOADS_DIR
-  if (mediaItem.url && mediaItem.url.startsWith('/uploads/')) {
-    const filename = path.basename(mediaItem.url);
-    const filePath = path.join(UPLOADS_DIR, filename);
-    if (fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch (e) {
-        console.warn('Could not delete disk file:', e);
-      }
-    }
-  }
-
-  db.media.splice(index, 1);
+  // Permanent asset protection: DO NOT delete physical file from disk or database registry.
+  // Mark category as 'unused' while preserving the file permanently on disk.
+  db.media[index].category = 'unused';
+  db.media[index].updatedAt = new Date().toISOString();
   writeDatabase(db);
-  res.json({ success: true, message: 'Media permanently deleted from disk and database' });
+
+  res.json({ 
+    success: true, 
+    message: 'Permanent asset protection is enabled. This asset cannot be automatically deleted and has been marked as Unused.' 
+  });
 });
 
 // Orders & Checkout API
@@ -1228,8 +1325,198 @@ app.put('/api/orders/:id/status', (req, res) => {
   res.json({ success: true, data: order || { id: req.params.id, status: req.body.status } });
 });
 
+// Backup & Recovery API
+app.get('/api/backups', (_req, res) => {
+  const db = readDatabase();
+  res.json({
+    success: true,
+    backups: db.backups || [],
+    auditLogs: db.auditLogs || [],
+  });
+});
+
+app.post('/api/backups', (req, res) => {
+  const db = readDatabase();
+  const type = req.body.type || 'Manual';
+  const now = new Date().toISOString();
+  const backupId = String(Date.now()).slice(-6);
+
+  const snapshot = {
+    categories: JSON.parse(JSON.stringify(db.categories)),
+    sections: JSON.parse(JSON.stringify(db.sections)),
+    products: JSON.parse(JSON.stringify(db.products)),
+    banners: JSON.parse(JSON.stringify(db.banners)),
+    media: JSON.parse(JSON.stringify(db.media)),
+    orders: JSON.parse(JSON.stringify(db.orders)),
+    settings: JSON.parse(JSON.stringify(db.settings)),
+  };
+
+  const recordCounts = {
+    products: snapshot.products.length,
+    categories: snapshot.categories.length,
+    sections: snapshot.sections.length,
+    banners: snapshot.banners.length,
+    media: snapshot.media.length,
+    orders: snapshot.orders.length,
+  };
+
+  const dataString = JSON.stringify(snapshot);
+  const checksum = crypto.createHash('sha256').update(dataString).digest('hex');
+  const sizeBytes = Buffer.byteLength(dataString, 'utf-8');
+
+  const newBackup = {
+    id: backupId,
+    timestamp: now,
+    type,
+    status: 'COMPLETE' as const,
+    recordCounts,
+    sizeBytes,
+    checksum,
+    dataSnapshot: snapshot,
+  };
+
+  if (!db.backups) db.backups = [];
+  db.backups.unshift(newBackup);
+
+  if (!db.auditLogs) db.auditLogs = [];
+  db.auditLogs.unshift({
+    id: `log-${Date.now()}`,
+    action: 'BACKUP_CREATED',
+    backupId,
+    timestamp: now,
+    details: `Created ${type} backup snapshot with ${recordCounts.products} products`,
+  });
+
+  writeDatabase(db);
+  res.status(201).json({ success: true, data: newBackup });
+});
+
+app.post('/api/backups/restore', (req, res) => {
+  const { backupId } = req.body;
+  const db = readDatabase();
+  const backups = db.backups || [];
+  const targetBackup = backups.find((b) => b.id === backupId);
+
+  if (!targetBackup) {
+    return res.status(404).json({ success: false, error: 'Backup snapshot not found' });
+  }
+
+  // 1. Create automatic pre-restore safety backup first
+  const safetyBackupId = `SAFETY-${String(Date.now()).slice(-6)}`;
+  const safetySnapshot = {
+    categories: JSON.parse(JSON.stringify(db.categories)),
+    sections: JSON.parse(JSON.stringify(db.sections)),
+    products: JSON.parse(JSON.stringify(db.products)),
+    banners: JSON.parse(JSON.stringify(db.banners)),
+    media: JSON.parse(JSON.stringify(db.media)),
+    orders: JSON.parse(JSON.stringify(db.orders)),
+    settings: JSON.parse(JSON.stringify(db.settings)),
+  };
+  const safetyBackup = {
+    id: safetyBackupId,
+    timestamp: new Date().toISOString(),
+    type: 'Pre-Restore Safety' as const,
+    status: 'COMPLETE' as const,
+    recordCounts: {
+      products: safetySnapshot.products.length,
+      categories: safetySnapshot.categories.length,
+      sections: safetySnapshot.sections.length,
+      banners: safetySnapshot.banners.length,
+      media: safetySnapshot.media.length,
+      orders: safetySnapshot.orders.length,
+    },
+    sizeBytes: Buffer.byteLength(JSON.stringify(safetySnapshot), 'utf-8'),
+    checksum: crypto.createHash('sha256').update(JSON.stringify(safetySnapshot)).digest('hex'),
+    dataSnapshot: safetySnapshot,
+  };
+  if (!db.backups) db.backups = [];
+  db.backups.unshift(safetyBackup);
+
+  // 2. Restore production state from target backup
+  db.categories = JSON.parse(JSON.stringify(targetBackup.dataSnapshot.categories));
+  db.sections = JSON.parse(JSON.stringify(targetBackup.dataSnapshot.sections));
+  db.products = JSON.parse(JSON.stringify(targetBackup.dataSnapshot.products));
+  db.banners = JSON.parse(JSON.stringify(targetBackup.dataSnapshot.banners));
+  db.media = JSON.parse(JSON.stringify(targetBackup.dataSnapshot.media));
+  db.orders = JSON.parse(JSON.stringify(targetBackup.dataSnapshot.orders));
+  db.settings = JSON.parse(JSON.stringify(targetBackup.dataSnapshot.settings));
+
+  if (!db.auditLogs) db.auditLogs = [];
+  db.auditLogs.unshift({
+    id: `log-${Date.now()}`,
+    action: 'RESTORE_COMPLETED',
+    backupId: targetBackup.id,
+    timestamp: new Date().toISOString(),
+    details: `Restored production from backup #${targetBackup.id} (Safety backup #${safetyBackupId} created)`,
+  });
+
+  writeDatabase(db);
+  res.json({ success: true, message: `Restored successfully from backup #${targetBackup.id}` });
+});
+
+app.post('/api/backups/import', (req, res) => {
+  const importedBackup = req.body;
+  if (!importedBackup || !importedBackup.dataSnapshot) {
+    return res.status(400).json({ success: false, error: 'Invalid backup format' });
+  }
+
+  const db = readDatabase();
+  const safetyId = `IMPORT-SAFETY-${String(Date.now()).slice(-6)}`;
+  if (!db.backups) db.backups = [];
+  db.backups.unshift({
+    id: safetyId,
+    timestamp: new Date().toISOString(),
+    type: 'Pre-Import Safety',
+    status: 'COMPLETE',
+    recordCounts: {
+      products: db.products.length,
+      categories: db.categories.length,
+      sections: db.sections.length,
+      banners: db.banners.length,
+      media: db.media.length,
+      orders: db.orders.length,
+    },
+    sizeBytes: Buffer.byteLength(JSON.stringify(db), 'utf-8'),
+    checksum: crypto.createHash('sha256').update(JSON.stringify(db)).digest('hex'),
+    dataSnapshot: {
+      categories: db.categories,
+      sections: db.sections,
+      products: db.products,
+      banners: db.banners,
+      media: db.media,
+      orders: db.orders,
+      settings: db.settings,
+    },
+  });
+
+  db.categories = importedBackup.dataSnapshot.categories || db.categories;
+  db.sections = importedBackup.dataSnapshot.sections || db.sections;
+  db.products = importedBackup.dataSnapshot.products || db.products;
+  db.banners = importedBackup.dataSnapshot.banners || db.banners;
+  db.media = importedBackup.dataSnapshot.media || db.media;
+  db.orders = importedBackup.dataSnapshot.orders || db.orders;
+  db.settings = importedBackup.dataSnapshot.settings || db.settings;
+
+  if (!db.backups) db.backups = [];
+  db.backups.unshift(importedBackup);
+
+  if (!db.auditLogs) db.auditLogs = [];
+  db.auditLogs.unshift({
+    id: `log-${Date.now()}`,
+    action: 'BACKUP_IMPORTED',
+    backupId: importedBackup.id || 'imported',
+    timestamp: new Date().toISOString(),
+    details: `Imported external backup snapshot successfully`,
+  });
+
+  writeDatabase(db);
+  res.json({ success: true, message: 'Backup imported successfully with safety backup' });
+});
+
 // Vite Middleware integration for development
 async function startServer() {
+  await syncFromCloudToLocal();
+
   const isDev = process.env.NODE_ENV !== 'production';
 
   if (isDev) {

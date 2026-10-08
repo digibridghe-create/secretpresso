@@ -21,6 +21,7 @@ import { BannerManager } from './BannerManager';
 import { MediaLibrary } from './MediaLibrary';
 import { OrdersManager } from './OrdersManager';
 import { SettingsManager } from './SettingsManager';
+import { BackupManager } from './BackupManager';
 
 type AdminTab =
   | 'overview'
@@ -30,7 +31,8 @@ type AdminTab =
   | 'banners'
   | 'media'
   | 'orders'
-  | 'settings';
+  | 'settings'
+  | 'backup';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -195,6 +197,18 @@ export const AdminDashboard: React.FC = () => {
               <Settings className="w-4 h-4" />
               <span>Website Settings</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab('backup')}
+              className={`w-full px-3.5 py-2.5 rounded-xl flex items-center gap-2.5 font-medium transition-colors ${
+                activeTab === 'backup'
+                  ? 'bg-[#c89b63] text-[#100c08] shadow-md'
+                  : 'text-[#cfbeae] hover:bg-[#20160f] hover:text-[#f5f0eb]'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Backup & Recovery</span>
+            </button>
           </nav>
         </div>
 
@@ -358,6 +372,7 @@ export const AdminDashboard: React.FC = () => {
         {activeTab === 'media' && <MediaLibrary />}
         {activeTab === 'orders' && <OrdersManager />}
         {activeTab === 'settings' && <SettingsManager />}
+        {activeTab === 'backup' && <BackupManager />}
       </main>
     </div>
   );

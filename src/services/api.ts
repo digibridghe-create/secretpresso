@@ -253,4 +253,44 @@ export const api = {
     if (!json.success) throw new Error(json.error || 'Failed to update settings');
     return json.data;
   },
+
+  async getBackups(): Promise<{ backups: any[]; auditLogs: any[] }> {
+    const res = await fetch('/api/backups');
+    const json = await res.json();
+    if (!json.success) throw new Error('Failed to load backups');
+    return { backups: json.backups || [], auditLogs: json.auditLogs || [] };
+  },
+
+  async createBackup(type: string = 'Manual'): Promise<any> {
+    const res = await fetch('/api/backups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to create backup');
+    return json.data;
+  },
+
+  async restoreBackup(backupId: string): Promise<any> {
+    const res = await fetch('/api/backups/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backupId }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to restore backup');
+    return json;
+  },
+
+  async importBackup(backupData: any): Promise<any> {
+    const res = await fetch('/api/backups/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(backupData),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to import backup');
+    return json;
+  },
 };

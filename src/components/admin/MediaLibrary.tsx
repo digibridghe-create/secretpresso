@@ -11,7 +11,7 @@ interface MediaLibraryProps {
 }
 
 export const MediaLibrary: React.FC<MediaLibraryProps> = ({ onSelectImage, isModal, onClose }) => {
-  const { media, refreshData, showToast } = useApp();
+  const { media, products, banners, categories, sections, refreshData, showToast } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadCategory, setUploadCategory] = useState<string>('hero');
@@ -20,6 +20,20 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({ onSelectImage, isMod
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getAssetUsage = (url: string) => {
+    const usedProducts = products.filter((p) => p.image === url || p.additionalImages?.includes(url));
+    const usedBanners = banners.filter((b) => b.image === url);
+    const usedCategories = categories.filter((c) => c.image === url);
+    const usedSections = sections.filter((s) => s.image === url);
+
+    const places: string[] = [];
+    usedProducts.forEach((p) => places.push(`Product: ${p.name}`));
+    usedBanners.forEach((b) => places.push(`Banner: ${b.name || b.heading}`));
+    usedCategories.forEach((c) => places.push(`Category: ${c.name}`));
+    usedSections.forEach((s) => places.push(`Section: ${s.name}`));
+    return places;
+  };
 
   const filteredMedia = selectedCategory === 'all'
     ? media
@@ -47,7 +61,10 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({ onSelectImage, isMod
   };
 
   const handleDeletePermanent = async (item: MediaItem) => {
-    if (!window.confirm(`Permanently delete "${item.name}" from server storage and database? This action cannot be undone.`)) {
+    const usage = getAssetUsage(item.url);
+    const usageText = usage.length > 0 ? `\n\nCurrently used in: ${usage.join(', ')}` : '\n\nCurrently Unused.';
+    
+    if (!window.confirm(`Permanent asset protection is enabled. This asset cannot be automatically deleted.${usageText}\n\nDo you want to mark it as Unused and keep the file permanently?`)) {
       return;
     }
 
@@ -55,10 +72,10 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({ onSelectImage, isMod
     try {
       await api.deleteMedia(item.id);
       await refreshData();
-      showToast(`Image deleted permanently`, 'success');
+      showToast('Permanent asset protection is enabled. Asset preserved in project storage and marked as Unused.', 'success');
       if (previewMedia?.id === item.id) setPreviewMedia(null);
     } catch (err: any) {
-      showToast(err.message || 'Failed to delete media', 'error');
+      showToast(err.message || 'Failed to update asset status', 'error');
     } finally {
       setDeletingId(null);
     }
@@ -193,9 +210,18 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({ onSelectImage, isMod
 
               {/* Media Info & Actions */}
               <div className="mt-2 space-y-1">
-                <p className="text-xs font-medium text-[#f5f0eb] truncate" title={item.name}>
-                  {item.name}
-                </p>
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-xs font-medium text-[#f5f0eb] truncate" title={item.name}>
+                    {item.name}
+                  </p>
+                  {(() => {
+                    const usage = getAssetUsage(item.url);
+                    if (usage.length > 0) {
+                      return <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 shrink-0" title={usage.join(', ')}>In Use</span>;
+                    }
+                    return <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60 shrink-0">Unused</span>;
+                  })()}
+                </div>
                 <p className="text-[10px] text-[#8e7c6d] truncate">
                   {item.url}
                 </p>
