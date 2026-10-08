@@ -99,10 +99,24 @@ function readDatabase(): DatabaseSchema {
   try {
     if (fs.existsSync(DB_FILE)) {
       const data = fs.readFileSync(DB_FILE, 'utf-8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      const initial = getInitialDatabase();
+      if (parsed && typeof parsed === 'object') {
+        return {
+          categories: Array.isArray(parsed.categories) && parsed.categories.length > 0 ? parsed.categories : initial.categories,
+          sections: Array.isArray(parsed.sections) && parsed.sections.length > 0 ? parsed.sections : initial.sections,
+          products: Array.isArray(parsed.products) && parsed.products.length > 0 ? parsed.products : initial.products,
+          banners: Array.isArray(parsed.banners) && parsed.banners.length > 0 ? parsed.banners : initial.banners,
+          media: Array.isArray(parsed.media) && parsed.media.length > 0 ? parsed.media : initial.media,
+          orders: Array.isArray(parsed.orders) ? parsed.orders : [],
+          settings: parsed.settings || initial.settings,
+          backups: Array.isArray(parsed.backups) ? parsed.backups : [],
+          auditLogs: Array.isArray(parsed.auditLogs) ? parsed.auditLogs : [],
+        };
+      }
     }
   } catch (err) {
-    console.error('Error reading database, fallback to initial:', err);
+    console.error('Error reading database, preserving fallback state:', err);
   }
   return getInitialDatabase();
 }
@@ -126,7 +140,7 @@ async function syncFromCloudToLocal() {
     }
 
     const setSnap = await getDoc(doc(firestoreDb, 'settings', 'website'));
-    if (setSnap.exists()) {
+    if (setSnap.exists() && setSnap.data()) {
       currentDb.settings = setSnap.data() as any;
       hasChanges = true;
     }
@@ -135,10 +149,10 @@ async function syncFromCloudToLocal() {
       const tempFile = `${DB_FILE}.tmp.${crypto.randomBytes(4).toString('hex')}`;
       fs.writeFileSync(tempFile, JSON.stringify(currentDb, null, 2), 'utf-8');
       fs.renameSync(tempFile, DB_FILE);
-      console.log('[SECRETpresso] Synced production data from Firebase Firestore cloud successfully.');
+      console.log('[SECRETpresso] Synced production data from Firebase Firestore cloud safely.');
     }
   } catch (err) {
-    console.warn('[SECRETpresso] Cloud sync notice:', err);
+    console.warn('[SECRETpresso] Cloud sync notice (retaining local state):', err);
   }
 }
 
@@ -969,10 +983,17 @@ app.put('/api/sections/:id', (req, res) => {
     return res.status(404).json({ success: false, error: 'Section not found' });
   }
 
+  const existing = db.sections[index];
+  const incoming = req.body;
+  const safeImage = (incoming.image !== undefined && incoming.image !== null && incoming.image !== '')
+    ? incoming.image
+    : existing.image;
+
   db.sections[index] = {
-    ...db.sections[index],
-    ...req.body,
-    id: req.params.id, // Immutable ID
+    ...existing,
+    ...incoming,
+    id: req.params.id,
+    image: safeImage,
     updatedAt: new Date().toISOString(),
   };
 
@@ -1061,14 +1082,36 @@ app.put('/api/products/:id', (req, res) => {
     return res.status(404).json({ success: false, error: 'Product not found' });
   }
 
+  const existing = db.products[index];
+  const incoming = req.body;
+  const safeImage = (incoming.image !== undefined && incoming.image !== null && incoming.image !== '')
+    ? incoming.image
+    : existing.image;
+  const safeAdditionalImages = (incoming.additionalImages !== undefined && Array.isArray(incoming.additionalImages) && incoming.additionalImages.length > 0)
+    ? incoming.additionalImages
+    : (existing.additionalImages || []);
+
   db.products[index] = {
-    ...db.products[index],
-    ...req.body,
+    ...existing,
+    ...incoming,
     id: req.params.id,
-    price: Number(req.body.price ?? db.products[index].price),
-    salePrice: req.body.salePrice !== undefined ? (req.body.salePrice ? Number(req.body.salePrice) : null) : db.products[index].salePrice,
+    image: safeImage,
+    additionalImages: safeAdditionalImages,
+    price: Number(incoming.price ?? existing.price),
+    salePrice: incoming.salePrice !== undefined ? (incoming.salePrice ? Number(incoming.salePrice) : null) : existing.salePrice,
     updatedAt: new Date().toISOString(),
   };
+
+  if (!db.auditLogs) db.auditLogs = [];
+  db.auditLogs.unshift({
+    id: `audit-${Date.now()}`,
+    recordId: req.params.id,
+    action: 'UPDATE_PRODUCT',
+    previousReference: existing.image,
+    newReference: safeImage,
+    timestamp: new Date().toISOString(),
+    result: 'SUCCESS',
+  });
 
   writeDatabase(db);
   res.json({ success: true, data: db.products[index] });
@@ -1120,10 +1163,17 @@ app.put('/api/categories/:id', (req, res) => {
     return res.status(404).json({ success: false, error: 'Category not found' });
   }
 
+  const existing = db.categories[index];
+  const incoming = req.body;
+  const safeImage = (incoming.image !== undefined && incoming.image !== null && incoming.image !== '')
+    ? incoming.image
+    : existing.image;
+
   db.categories[index] = {
-    ...db.categories[index],
-    ...req.body,
+    ...existing,
+    ...incoming,
     id: req.params.id,
+    image: safeImage,
     updatedAt: new Date().toISOString(),
   };
 
@@ -1188,10 +1238,17 @@ app.put('/api/banners/:id', (req, res) => {
     return res.status(404).json({ success: false, error: 'Banner not found' });
   }
 
+  const existing = db.banners[index];
+  const incoming = req.body;
+  const safeImage = (incoming.image !== undefined && incoming.image !== null && incoming.image !== '')
+    ? incoming.image
+    : existing.image;
+
   db.banners[index] = {
-    ...db.banners[index],
-    ...req.body,
+    ...existing,
+    ...incoming,
     id: req.params.id,
+    image: safeImage,
     updatedAt: new Date().toISOString(),
   };
 
@@ -1232,6 +1289,9 @@ app.post('/api/media/upload', upload.single('file') as any, (req: any, res: any)
     category: req.body.category || 'other',
     size: req.file.size,
     mimeType: req.file.mimetype,
+    status: 'ACTIVE',
+    backupProtected: true,
+    version: 1,
     createdAt: now,
     updatedAt: now,
   };
@@ -1254,14 +1314,16 @@ app.delete('/api/media/:id', (req, res) => {
   }
 
   // Permanent asset protection: DO NOT delete physical file from disk or database registry.
-  // Mark category as 'unused' while preserving the file permanently on disk.
-  db.media[index].category = 'unused';
+  // Mark status as ARCHIVED and backupProtected = true.
+  db.media[index].status = 'ARCHIVED';
+  db.media[index].category = 'archived';
+  db.media[index].backupProtected = true;
   db.media[index].updatedAt = new Date().toISOString();
   writeDatabase(db);
 
   res.json({ 
     success: true, 
-    message: 'Permanent asset protection is enabled. This asset cannot be automatically deleted and has been marked as Unused.' 
+    message: 'Permanent asset protection enabled: media is archived and protected from physical deletion.' 
   });
 });
 

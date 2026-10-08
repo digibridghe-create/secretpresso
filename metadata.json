@@ -1,6 +1,7 @@
 {
   "name": "SECRETpresso",
-  "description": "Premium specialty coffee combined with a collectible surprise experience. Discover exquisite roasts, handcrafted sweets, and secret collectible figurines.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "description": "Premium specialty coffee combined with a collectible surprise experience.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
