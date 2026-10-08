@@ -30,6 +30,7 @@ import { getFirestore, collection, doc, getDocs, setDoc, getDoc } from 'firebase
 import firebaseConfig from './firebase-applet-config.json';
 
 let firestoreDb: any = null;
+let cloudSyncDisabled = false;
 try {
   const firebaseApp = initializeApp(firebaseConfig);
   firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
@@ -122,7 +123,7 @@ function readDatabase(): DatabaseSchema {
 }
 
 async function syncFromCloudToLocal() {
-  if (!firestoreDb) return;
+  if (!firestoreDb || cloudSyncDisabled) return;
   try {
     const collectionsList = ['categories', 'sections', 'products', 'banners', 'media', 'orders'];
     const currentDb = readDatabase();
@@ -151,8 +152,14 @@ async function syncFromCloudToLocal() {
       fs.renameSync(tempFile, DB_FILE);
       console.log('[SECRETpresso] Synced production data from Firebase Firestore cloud safely.');
     }
-  } catch (err) {
-    console.warn('[SECRETpresso] Cloud sync notice (retaining local state):', err);
+  } catch (err: any) {
+    const msg = String(err?.message || '');
+    if (msg.includes('PERMISSION_DENIED') || (err as any)?.code === 'permission-denied') {
+      cloudSyncDisabled = true;
+      console.warn('[SECRETpresso] Firestore permission denied — switching exclusively to local robust persistence.');
+    } else {
+      console.warn('[SECRETpresso] Cloud sync notice (retaining local state):', err);
+    }
   }
 }
 
@@ -163,7 +170,7 @@ function writeDatabase(data: DatabaseSchema): boolean {
     fs.renameSync(tempFile, DB_FILE);
 
     // Mirror to Firestore for cross-device & cross-account persistence
-    if (firestoreDb) {
+    if (firestoreDb && !cloudSyncDisabled) {
       (async () => {
         try {
           for (const cat of data.categories) {
@@ -193,8 +200,11 @@ function writeDatabase(data: DatabaseSchema): boolean {
           if (data.settings) {
             await setDoc(doc(firestoreDb, 'settings', 'website'), data.settings, { merge: true });
           }
-        } catch (cloudErr) {
-          console.warn('[SECRETpresso] Cloud write mirror notice:', cloudErr);
+        } catch (cloudErr: any) {
+          const msg = String(cloudErr?.message || '');
+          if (msg.includes('PERMISSION_DENIED') || (cloudErr as any)?.code === 'permission-denied') {
+            cloudSyncDisabled = true;
+          }
         }
       })();
     }
