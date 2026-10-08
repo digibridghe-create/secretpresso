@@ -1,17 +1,19 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-// Suppress benign Firestore gRPC idle stream warnings
+// Suppress benign Firestore gRPC and permission notices
 const originalWarn = console.warn;
 console.warn = (...args: any[]) => {
-  if (typeof args[0] === 'string' && (args[0].includes('GrpcConnection') || args[0].includes('Disconnecting idle stream'))) {
+  const msg = String(args[0] || '');
+  if (msg.includes('GrpcConnection') || msg.includes('Disconnecting idle stream') || msg.includes('PERMISSION_DENIED') || msg.includes('Cloud write mirror notice')) {
     return;
   }
   originalWarn(...args);
 };
 const originalError = console.error;
 console.error = (...args: any[]) => {
-  if (typeof args[0] === 'string' && (args[0].includes('GrpcConnection') || args[0].includes('Disconnecting idle stream'))) {
+  const msg = String(args[0] || '');
+  if (msg.includes('GrpcConnection') || msg.includes('Disconnecting idle stream') || msg.includes('PERMISSION_DENIED') || msg.includes('Cloud write mirror notice')) {
     return;
   }
   originalError(...args);
